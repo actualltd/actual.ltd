@@ -24,10 +24,32 @@ let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
 let visual: VisualController | null = null;
 let wheelDistance = 0;
+let wheelDirection: -1 | 0 | 1 = 0;
 let wheelGestureActive = false;
 let wheelResetTimer = 0;
 let touchStartX: number | null = null;
 let touchStartY: number | null = null;
+let navigationLockedUntil = 0;
+
+const WHEEL_TRIGGER_DISTANCE = 32;
+const WHEEL_GESTURE_IDLE_MS = 320;
+const NAVIGATION_LOCK_MS = 1040;
+
+function navigateScene(direction: -1 | 1): boolean {
+  const now = performance.now();
+  if (!visual || now < navigationLockedUntil) return false;
+
+  navigationLockedUntil = now + NAVIGATION_LOCK_MS;
+  if (direction > 0) visual.nextScene();
+  else visual.previousScene();
+  return true;
+}
+
+function resetWheelGesture(): void {
+  wheelDistance = 0;
+  wheelDirection = 0;
+  wheelGestureActive = false;
+}
 
 function updateRecord(state: VisualState): void {
   const nextNumber = state.index % 3 + 1;
@@ -95,19 +117,18 @@ window.addEventListener("keydown", (event) => {
 
   if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
     event.preventDefault();
-    visual?.nextScene();
+    if (!event.repeat) navigateScene(1);
   } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp") {
     event.preventDefault();
-    visual?.previousScene();
+    if (!event.repeat) navigateScene(-1);
   } else if (event.key === " " && !isControl) {
     event.preventDefault();
-    if (event.shiftKey) visual?.previousScene();
-    else visual?.nextScene();
+    if (!event.repeat) navigateScene(event.shiftKey ? -1 : 1);
   }
 });
 
 window.addEventListener("wheel", (event) => {
-  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  if (Math.abs(event.deltaY) < Math.abs(event.deltaX) * 0.75 || event.deltaY === 0) return;
   event.preventDefault();
 
   const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -115,28 +136,25 @@ window.addEventListener("wheel", (event) => {
     : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
       ? window.innerHeight
       : 1;
-
-  if (!wheelGestureActive) {
-    wheelDistance += event.deltaY * unit;
-    if (Math.abs(wheelDistance) >= 44) {
-      if (wheelDistance > 0) visual?.nextScene();
-      else visual?.previousScene();
-      wheelGestureActive = true;
-    }
-  }
+  const distance = event.deltaY * unit;
+  const direction = Math.sign(distance) as -1 | 1;
 
   window.clearTimeout(wheelResetTimer);
-  wheelResetTimer = window.setTimeout(() => {
-    wheelDistance = 0;
-    wheelGestureActive = false;
-  }, 180);
+  wheelResetTimer = window.setTimeout(resetWheelGesture, WHEEL_GESTURE_IDLE_MS);
+
+  if (!wheelGestureActive) {
+    if (wheelDirection !== 0 && direction !== wheelDirection) wheelDistance = 0;
+    wheelDirection = direction;
+    wheelDistance += distance;
+
+    if (Math.abs(wheelDistance) >= WHEEL_TRIGGER_DISTANCE) {
+      if (visual) {
+        wheelGestureActive = true;
+        navigateScene(direction);
+      }
+    }
+  }
 }, { passive: false });
-
-window.addEventListener("pointermove", (event) => {
-  visual?.setPointer(event.clientX / window.innerWidth, event.clientY / window.innerHeight);
-}, { passive: true });
-
-document.documentElement.addEventListener("pointerleave", () => visual?.setPointer(0.5, 0.5));
 
 window.addEventListener("pointerdown", (event) => {
   if (event.pointerType !== "touch") return;
@@ -152,8 +170,7 @@ window.addEventListener("pointerup", (event) => {
   touchStartY = null;
 
   if (Math.abs(distanceY) < 52 || Math.abs(distanceY) <= Math.abs(distanceX) * 1.1) return;
-  if (distanceY < 0) visual?.nextScene();
-  else visual?.previousScene();
+  navigateScene(distanceY < 0 ? 1 : -1);
 });
 
 window.addEventListener("pointercancel", () => {
@@ -176,11 +193,9 @@ reducedMotionQuery.addEventListener("change", (event) => {
 
 window.addEventListener("pagehide", (event) => {
   window.clearTimeout(wheelResetTimer);
+  resetWheelGesture();
   if (!event.persisted) visual?.destroy();
 }, { once: true });
 
 updateMotionControl();
-
-window.addEventListener("load", () => {
-  requestAnimationFrame(() => void initialiseVisual());
-}, { once: true });
+requestAnimationFrame(() => void initialiseVisual());

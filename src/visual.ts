@@ -52,7 +52,6 @@ export const VISUAL_STATES: readonly VisualState[] = [
 
 export interface VisualController {
   setMotionEnabled(enabled: boolean): void;
-  setPointer(x: number, y: number): void;
   nextScene(): void;
   previousScene(): void;
   destroy(): void;
@@ -83,7 +82,6 @@ interface Layer {
   depth: number;
   opacity: number;
   paperWash?: number;
-  rotation?: number;
   shape?: LayerShape;
 }
 
@@ -145,6 +143,7 @@ const INK = [17, 16, 14] as const;
 const PAPER = [231, 224, 212] as const;
 const FULL_IMAGE: Crop = { x: 0, y: 0, width: 1, height: 1 };
 const FRAME_INTERVAL = 1000 / 24;
+const SCENE_TRANSITION_MS = 960;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -183,12 +182,12 @@ function prepareDitheredAsset(
   const outputContext = output.getContext("2d");
   if (!sourceContext || !outputContext) return output;
 
-  sourceContext.filter = "grayscale(1) contrast(1.34)";
+  sourceContext.filter = "grayscale(1) contrast(1.18)";
   sourceContext.drawImage(image, 0, 0, width, height);
   const sourcePixels = sourceContext.getImageData(0, 0, width, height).data;
 
   if (technique === "halftone") {
-    const cell = 7;
+    const cell = 8;
     outputContext.fillStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
     for (let y = 0; y < height; y += cell) {
       for (let x = 0; x < width; x += cell) {
@@ -200,9 +199,9 @@ function prepareDitheredAsset(
         const blue = sourcePixels[offset + 2] ?? 255;
         const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
         const density = invert
-          ? clamp((luminance - 0.56) * 2.35, 0, 1)
-          : clamp((0.62 - luminance) * 2.1, 0, 1);
-        const radius = Math.sqrt(density) * cell * 0.54;
+          ? clamp((luminance - 0.6) * 1.85, 0, 1)
+          : clamp((0.57 - luminance) * 1.7, 0, 1);
+        const radius = Math.sqrt(density) * cell * 0.5;
         if (radius < 0.4) continue;
         outputContext.beginPath();
         outputContext.arc(x + cell / 2, y + cell / 2, radius, 0, Math.PI * 2);
@@ -220,7 +219,7 @@ function prepareDitheredAsset(
     const blue = sourcePixels[offset + 2] ?? 255;
     const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
     const tone = invert ? 1 - luminance : luminance;
-    tones[pixel] = clamp((tone - 0.5) * 1.28 + 0.5, 0, 1);
+    tones[pixel] = clamp((tone - 0.5) * 1.08 + 0.5, 0, 1);
   }
 
   const outputPixels = outputContext.createImageData(width, height);
@@ -265,7 +264,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     options.onUnavailable();
     return {
       setMotionEnabled: () => undefined,
-      setPointer: () => undefined,
       nextScene: () => undefined,
       previousScene: () => undefined,
       destroy: () => undefined,
@@ -282,14 +280,10 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   let activeStateIndex = 0;
   let previousStateIndex = 0;
   let transitionStartedAt = -Infinity;
-  let pointerX = 0.5;
-  let pointerY = 0.5;
-  let pointerTargetX = 0.5;
-  let pointerTargetY = 0.5;
   let elapsed = 0;
   let lastTime: number | undefined;
 
-  const hasTransition = (time: number): boolean => time - transitionStartedAt < 960;
+  const hasTransition = (time: number): boolean => time - transitionStartedAt < SCENE_TRANSITION_MS;
 
   const clipLayer = (ctx: CanvasRenderingContext2D, layer: Layer): void => {
     const { x, y, width, height } = layer;
@@ -321,12 +315,10 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     time: number,
     phase: number,
   ): void => {
-    const pointerOffsetX = (pointerX - 0.5) * layer.depth * composition.width * 0.052;
-    const pointerOffsetY = (pointerY - 0.5) * layer.depth * composition.height * 0.045;
-    const driftX = motionEnabled ? Math.sin(time * 0.00013 + phase) * layer.depth * composition.width * 0.008 : 0;
-    const driftY = motionEnabled ? Math.cos(time * 0.00011 + phase * 1.4) * layer.depth * composition.height * 0.007 : 0;
-    const x = layer.x + pointerOffsetX + driftX;
-    const y = layer.y + pointerOffsetY + driftY;
+    const driftX = motionEnabled ? Math.sin(time * 0.00013 + phase) * layer.depth * composition.width * 0.0025 : 0;
+    const driftY = motionEnabled ? Math.cos(time * 0.00011 + phase * 1.4) * layer.depth * composition.height * 0.002 : 0;
+    const x = layer.x + driftX;
+    const y = layer.y + driftY;
     const sourceX = layer.crop.x * image.naturalWidth;
     const sourceY = layer.crop.y * image.naturalHeight;
     const sourceWidth = layer.crop.width * image.naturalWidth;
@@ -334,10 +326,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
     compositionContext.save();
     compositionContext.globalAlpha = layer.opacity * sceneAlpha;
-    compositionContext.filter = "grayscale(1) contrast(1.14)";
-    compositionContext.translate(x + layer.width / 2, y + layer.height / 2);
-    compositionContext.rotate(layer.rotation ?? 0);
-    compositionContext.translate(-x - layer.width / 2, -y - layer.height / 2);
+    compositionContext.filter = "grayscale(1) contrast(1.18)";
     clipLayer(compositionContext, { ...layer, x, y });
     compositionContext.drawImage(
       image,
@@ -358,13 +347,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const width = Math.min(composition.width * 0.72, composition.height * 1.25);
     const height = width * 0.675;
     const x = composition.width * 0.5 - width * 0.5;
-    const y = composition.height * 0.47 - height * 0.5;
+    const y = composition.height * 0.45 - height * 0.5;
 
     const layers: Layer[] = [
-      { x: x - width * 0.09, y: y + height * 0.02, width: width * 0.9, height: height * 0.9, crop: FULL_IMAGE, depth: 0.32, opacity: 0.22, rotation: -0.025, shape: "slant-left" },
-      { x: x + width * 0.03, y: y - height * 0.04, width: width * 0.94, height: height * 0.94, crop: FULL_IMAGE, depth: 0.58, opacity: 0.8, rotation: 0.012, shape: "slant-right" },
-      { x: x - width * 0.12, y: y + height * 0.01, width: width * 0.52, height: height * 0.72, crop: { x: 0.02, y: 0.06, width: 0.58, height: 0.82 }, depth: 1, opacity: 0.58, rotation: -0.018, shape: "slant-left" },
-      { x: x + width * 0.55, y: y + height * 0.45, width: width * 0.31, height: height * 0.29, crop: { x: 0.48, y: 0.42, width: 0.32, height: 0.28 }, depth: 0.78, opacity: 0.64, rotation: 0.032, shape: "rect" },
+      { x, y, width, height, crop: FULL_IMAGE, depth: 0.18, opacity: 0.92, shape: "rect" },
+      { x: x + width * 0.54, y: y - height * 0.02, width: width * 0.4, height: height * 0.5, crop: { x: 0.48, y: 0.08, width: 0.45, height: 0.56 }, depth: 0.46, opacity: 0.18, shape: "rect" },
     ];
 
     layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.9));
@@ -383,18 +370,15 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
   const drawHorses = (alpha: number, time: number): void => {
     const image = images[1];
-    const width = Math.min(composition.width * 0.59, composition.height * 1.03);
+    const width = Math.min(composition.width * 0.64, composition.height * 1.08);
     const height = width * 0.79;
     const x = composition.width * 0.5 - width * 0.5;
     const y = composition.height * 0.42 - height * 0.5;
     const frame = motionEnabled ? Math.floor(elapsed / 360) % 20 : 7;
 
     const layers: Layer[] = [
-      { x: x - width * 0.08, y: y - height * 0.02, width: width * 0.89, height, crop: FULL_IMAGE, depth: 0.22, opacity: 0.24, rotation: -0.018, shape: "slant-right" },
-      { x: x + width * 0.08, y: y + height * 0.02, width: width * 0.84, height: height * 0.83, crop: { x: 0.19, y: 0.2, width: 0.62, height: 0.58 }, depth: 0.5, opacity: 0.74, rotation: 0.009, shape: "rect" },
-      { x: x - width * 0.1, y: y + height * 0.07, width: width * 0.31, height: height * 0.38, crop: horseCrop(frame), depth: 1, opacity: 0.74, rotation: -0.026, shape: "slant-left" },
-      { x: x + width * 0.68, y: y + height * 0.5, width: width * 0.27, height: height * 0.33, crop: horseCrop((frame + 6) % 20), depth: 0.82, opacity: 0.68, rotation: 0.034, shape: "slant-right" },
-      { x: x + width * 0.42, y: y - height * 0.1, width: width * 0.23, height: height * 0.28, crop: horseCrop((frame + 13) % 20), depth: 0.68, opacity: 0.5, rotation: -0.012, shape: "rect" },
+      { x, y, width, height, crop: FULL_IMAGE, depth: 0.16, opacity: 0.9, shape: "rect" },
+      { x: x + width * 0.37, y: y - height * 0.12, width: width * 0.26, height: height * 0.25, crop: horseCrop(frame), depth: 0.5, opacity: 0.25, shape: "rect" },
     ];
 
     layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.4));
@@ -405,13 +389,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const width = Math.min(composition.width * 0.72, composition.height * 1.18);
     const height = width * 0.625;
     const x = composition.width * 0.5 - width * 0.5;
-    const y = composition.height * 0.47 - height * 0.5;
+    const y = composition.height * 0.45 - height * 0.5;
 
     const layers: Layer[] = [
-      { x: x - width * 0.06, y: y - height * 0.02, width: width * 0.96, height: height * 0.94, crop: FULL_IMAGE, depth: 0.15, opacity: 0.72, rotation: -0.012, shape: "slant-left" },
-      { x: x + width * 0.53, y: y + height * 0.03, width: width * 0.34, height: height * 0.48, crop: { x: 0.44, y: 0.15, width: 0.28, height: 0.5 }, depth: 0.92, opacity: 0.78, rotation: 0.02, shape: "ellipse" },
-      { x: x - width * 0.11, y: y + height * 0.62, width: width * 1.03, height: height * 0.3, crop: { x: 0, y: 0.67, width: 1, height: 0.3 }, depth: 1, opacity: 0.78, rotation: -0.016, shape: "slant-right" },
-      { x: x + width * 0.03, y: y + height * 0.12, width: width * 0.48, height: height * 0.36, crop: { x: 0.32, y: 0.12, width: 0.5, height: 0.48 }, depth: 0.48, opacity: 0.32, rotation: 0.012, shape: "rect" },
+      { x, y, width, height, crop: FULL_IMAGE, depth: 0.14, opacity: 0.9, shape: "rect" },
+      { x: x - width * 0.03, y: y + height * 0.67, width: width * 1.03, height: height * 0.23, crop: { x: 0, y: 0.68, width: 1, height: 0.25 }, depth: 0.42, opacity: 0.2, shape: "rect" },
     ];
 
     layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 2.1));
@@ -455,21 +437,16 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     time: number,
     phase: number,
   ): void => {
-    const pointerOffsetX = (pointerX - 0.5) * layer.depth * canvas.width * 0.075;
-    const pointerOffsetY = (pointerY - 0.5) * layer.depth * canvas.height * 0.055;
-    const driftX = motionEnabled ? Math.sin(time * 0.00016 + phase) * layer.depth * canvas.width * 0.012 : 0;
-    const driftY = motionEnabled ? Math.cos(time * 0.00012 + phase * 1.3) * layer.depth * canvas.height * 0.009 : 0;
-    const x = layer.x + pointerOffsetX + driftX;
-    const y = layer.y + pointerOffsetY + driftY;
+    const driftX = motionEnabled ? Math.sin(time * 0.00016 + phase) * layer.depth * canvas.width * 0.003 : 0;
+    const driftY = motionEnabled ? Math.cos(time * 0.00012 + phase * 1.3) * layer.depth * canvas.height * 0.0024 : 0;
+    const x = layer.x + driftX;
+    const y = layer.y + driftY;
     const sourceX = layer.crop.x * media.width;
     const sourceY = layer.crop.y * media.height;
     const sourceWidth = layer.crop.width * media.width;
     const sourceHeight = layer.crop.height * media.height;
 
     context.save();
-    context.translate(x + layer.width / 2, y + layer.height / 2);
-    context.rotate(layer.rotation ?? 0);
-    context.translate(-x - layer.width / 2, -y - layer.height / 2);
     clipLayer(context, { ...layer, x, y });
     context.globalAlpha = sceneAlpha * (layer.paperWash ?? 0.14);
     context.fillStyle = `rgb(${PAPER[0]} ${PAPER[1]} ${PAPER[2]})`;
@@ -493,12 +470,12 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const width = canvas.width;
     const height = canvas.height;
     const compact = height > width * 1.35;
-    const driftX = (pointerX - 0.5) * width * 0.05 + (motionEnabled ? Math.sin(time * 0.00018) * width * 0.008 : 0);
-    const driftY = (pointerY - 0.5) * height * 0.035 + (motionEnabled ? Math.cos(time * 0.00015) * height * 0.006 : 0);
+    const driftX = motionEnabled ? Math.sin(time * 0.00018) * width * 0.002 : 0;
+    const driftY = motionEnabled ? Math.cos(time * 0.00015) * height * 0.0015 : 0;
 
     context.save();
     context.translate(driftX, driftY);
-    context.globalAlpha = alpha * 0.42;
+    context.globalAlpha = alpha * 0.16;
     context.strokeStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
     context.fillStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
     context.lineWidth = 0.7;
@@ -520,7 +497,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         );
         context.stroke();
       }
-      context.globalAlpha = alpha * 0.32;
+      context.globalAlpha = alpha * 0.12;
       context.fillText(".  :  *  %  ~  ~", width * 0.12, height * (compact ? 0.47 : 0.22));
       context.fillText("~  ~  %  *  :  .", width * 0.58, height * (compact ? 0.31 : 0.57));
     } else if (sceneIndex === 1) {
@@ -536,7 +513,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         context.fillText(String(line + 1).padStart(2, "0"), x - 4, top - 6);
       }
       context.setLineDash([]);
-      context.globalAlpha = alpha * 0.24;
+      context.globalAlpha = alpha * 0.1;
       for (let line = 0; line < 4; line += 1) {
         const y = top + (bottom - top) * (line / 3);
         context.fillRect(width * 0.13, y, width * 0.74, 1);
@@ -565,7 +542,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       context.moveTo(centerX, centerY - width * 0.045);
       context.lineTo(centerX, centerY + width * 0.045);
       context.stroke();
-      context.globalAlpha = alpha * 0.34;
+      context.globalAlpha = alpha * 0.12;
       context.fillText("LAT 00.0 / LON 00.0", width * 0.13, height * (compact ? 0.53 : 0.58));
     }
 
@@ -583,29 +560,29 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
     if (compact) {
       if (sceneIndex === 0) {
-        figure = { x: width * 0.12, y: height * 0.27, width: width * 0.26, height: width * 0.55, crop: FULL_IMAGE, depth: 1.12, opacity: 0.94, rotation: -0.025, shape: "slant-left" };
-        object = { x: width * 0.64, y: height * 0.32, width: width * 0.23, height: width * 0.31, crop: FULL_IMAGE, depth: 1.58, opacity: 0.88, rotation: 0.075, shape: "ellipse" };
+        figure = { x: width * 0.1, y: height * 0.31, width: width * 0.21, height: width * 0.5, crop: FULL_IMAGE, depth: 0.72, opacity: 0.64, paperWash: 0.24, shape: "rect" };
+        object = { x: width * 0.7, y: height * 0.34, width: width * 0.15, height: width * 0.23, crop: FULL_IMAGE, depth: 0.92, opacity: 0.58, paperWash: 0.16, shape: "ellipse" };
       } else if (sceneIndex === 1) {
-        figure = { x: width * 0.61, y: height * 0.27, width: width * 0.27, height: width * 0.53, crop: FULL_IMAGE, depth: 1.18, opacity: 0.94, rotation: 0.018, shape: "slant-right" };
-        object = { x: width * 0.12, y: height * 0.32, width: width * 0.25, height: width * 0.25, crop: FULL_IMAGE, depth: 1.62, opacity: 0.9, rotation: -0.055, shape: "ellipse" };
+        figure = { x: width * 0.72, y: height * 0.3, width: width * 0.17, height: width * 0.48, crop: FULL_IMAGE, depth: 0.74, opacity: 0.62, paperWash: 0.24, shape: "rect" };
+        object = { x: width * 0.12, y: height * 0.38, width: width * 0.16, height: width * 0.22, crop: FULL_IMAGE, depth: 0.94, opacity: 0.54, paperWash: 0.16, shape: "ellipse" };
       } else {
-        figure = { x: width * 0.11, y: height * 0.31, width: width * 0.33, height: width * 0.45, crop: FULL_IMAGE, depth: 1.2, opacity: 0.96, paperWash: 0.58, rotation: -0.02, shape: "slant-left" };
-        object = { x: width * 0.61, y: height * 0.3, width: width * 0.28, height: width * 0.28, crop: { x: 0.28, y: 0.18, width: 0.62, height: 0.62 }, depth: 1.7, opacity: 0.94, rotation: 0.035, shape: "ellipse" };
+        figure = { x: width * 0.1, y: height * 0.34, width: width * 0.24, height: width * 0.48, crop: FULL_IMAGE, depth: 0.76, opacity: 0.66, paperWash: 0.34, shape: "rect" };
+        object = { x: width * 0.7, y: height * 0.36, width: width * 0.17, height: width * 0.23, crop: FULL_IMAGE, depth: 0.96, opacity: 0.6, paperWash: 0.18, shape: "rect" };
       }
     } else if (sceneIndex === 0) {
-      figure = { x: width * 0.18, y: height * 0.1, width: width * 0.22, height: height * 0.62, crop: FULL_IMAGE, depth: 1.12, opacity: 0.94, rotation: -0.025, shape: "slant-left" };
-      object = { x: width * 0.68, y: height * 0.24, width: width * 0.18, height: height * 0.34, crop: FULL_IMAGE, depth: 1.58, opacity: 0.88, rotation: 0.075, shape: "ellipse" };
+      figure = { x: width * 0.12, y: height * 0.14, width: width * 0.17, height: height * 0.53, crop: FULL_IMAGE, depth: 0.72, opacity: 0.64, paperWash: 0.24, shape: "rect" };
+      object = { x: width * 0.73, y: height * 0.31, width: width * 0.13, height: height * 0.24, crop: FULL_IMAGE, depth: 0.92, opacity: 0.58, paperWash: 0.16, shape: "ellipse" };
     } else if (sceneIndex === 1) {
-      figure = { x: width * 0.62, y: height * 0.09, width: width * 0.21, height: height * 0.63, crop: FULL_IMAGE, depth: 1.18, opacity: 0.94, rotation: 0.018, shape: "slant-right" };
-      object = { x: width * 0.16, y: height * 0.22, width: width * 0.2, height: height * 0.32, crop: FULL_IMAGE, depth: 1.62, opacity: 0.9, rotation: -0.055, shape: "ellipse" };
+      figure = { x: width * 0.71, y: height * 0.16, width: width * 0.15, height: height * 0.48, crop: FULL_IMAGE, depth: 0.74, opacity: 0.62, paperWash: 0.24, shape: "rect" };
+      object = { x: width * 0.16, y: height * 0.34, width: width * 0.13, height: height * 0.2, crop: FULL_IMAGE, depth: 0.94, opacity: 0.54, paperWash: 0.16, shape: "ellipse" };
     } else {
-      figure = { x: width * 0.16, y: height * 0.2, width: width * 0.29, height: height * 0.49, crop: FULL_IMAGE, depth: 1.2, opacity: 0.96, paperWash: 0.58, rotation: -0.02, shape: "slant-left" };
-      object = { x: width * 0.62, y: height * 0.17, width: width * 0.25, height: height * 0.36, crop: { x: 0.28, y: 0.18, width: 0.62, height: 0.62 }, depth: 1.7, opacity: 0.94, rotation: 0.035, shape: "ellipse" };
+      figure = { x: width * 0.14, y: height * 0.24, width: width * 0.18, height: height * 0.4, crop: FULL_IMAGE, depth: 0.76, opacity: 0.66, paperWash: 0.34, shape: "rect" };
+      object = { x: width * 0.72, y: height * 0.31, width: width * 0.14, height: height * 0.22, crop: FULL_IMAGE, depth: 0.96, opacity: 0.6, paperWash: 0.18, shape: "rect" };
     }
 
+    drawEffectLayer(sceneIndex, alpha, time);
     drawPreparedLayer(media.figure, figure, alpha, time, sceneIndex * 1.7 + 0.8);
     drawPreparedLayer(media.object, object, alpha, time, sceneIndex * 1.7 + 2.4);
-    drawEffectLayer(sceneIndex, alpha, time);
   };
 
   const render = (time: number): void => {
@@ -620,7 +597,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     let previousAlpha = 0;
     let activeAlpha = 1;
     if (hasTransition(time)) {
-      const progress = easeInOut(clamp((time - transitionStartedAt) / 960, 0, 1));
+      const progress = easeInOut(clamp((time - transitionStartedAt) / SCENE_TRANSITION_MS, 0, 1));
       previousAlpha = 1 - progress;
       activeAlpha = progress;
       drawScene(previousStateIndex, previousAlpha, time);
@@ -634,9 +611,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     if (previousAlpha > 0.001) drawMixedMedia(previousStateIndex, previousAlpha, time);
     drawMixedMedia(activeStateIndex, activeAlpha, time);
   };
-
-  const needsInteractionFrame = (): boolean =>
-    Math.abs(pointerX - pointerTargetX) > 0.0006 || Math.abs(pointerY - pointerTargetY) > 0.0006;
 
   const scheduleFrame = (): void => {
     if (frameRequest === 0 && loaded && !destroyed && !document.hidden) {
@@ -653,24 +627,24 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
     if (lastTime !== undefined && motionEnabled) elapsed += Math.min(time - lastTime, 50);
     lastTime = time;
-    pointerX += (pointerTargetX - pointerX) * 0.075;
-    pointerY += (pointerTargetY - pointerY) * 0.075;
 
     const transitioning = hasTransition(time);
-    if (time - lastFrameAt >= FRAME_INTERVAL || transitioning || needsInteractionFrame()) {
+    if (time - lastFrameAt >= FRAME_INTERVAL || transitioning) {
       render(time);
       lastFrameAt = time;
     }
 
-    if (motionEnabled || transitioning || needsInteractionFrame()) scheduleFrame();
+    if (motionEnabled || transitioning) scheduleFrame();
     else lastTime = undefined;
   }
 
   const goToScene = (nextIndex: number): void => {
     if (destroyed || nextIndex === activeStateIndex) return;
+    const now = performance.now();
+    if (hasTransition(now)) return;
     previousStateIndex = activeStateIndex;
     activeStateIndex = (nextIndex + VISUAL_STATES.length) % VISUAL_STATES.length;
-    transitionStartedAt = performance.now();
+    transitionStartedAt = now;
     options.onStateChange(VISUAL_STATES[activeStateIndex]);
     scheduleFrame();
   };
@@ -746,13 +720,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       motionEnabled = enabled;
       lastTime = undefined;
       render(performance.now());
-      scheduleFrame();
-    },
-
-    setPointer(x: number, y: number): void {
-      if (destroyed) return;
-      pointerTargetX = clamp(x, 0, 1);
-      pointerTargetY = clamp(y, 0, 1);
       scheduleFrame();
     },
 
