@@ -47,8 +47,6 @@ export interface VisualState {
   artist: string;
   date: string;
   imageUrl: string;
-  sourceLabel: string;
-  sourceUrl: string;
   credits: readonly ArtworkCredit[];
 }
 
@@ -62,8 +60,6 @@ export const VISUAL_STATES: readonly VisualState[] = [
     artist: "JACQUES LOUIS DAVID",
     date: "1787",
     imageUrl: "/art/archive/form-environment.webp",
-    sourceLabel: "3 WORKS — THE MET CC0",
-    sourceUrl: "/llms.txt#record-001-form",
     credits: [
       { role: "environment", title: "The Death of Socrates", artist: "Jacques Louis David", date: "1787", sourceUrl: "https://www.metmuseum.org/art/collection/search/436105" },
       { role: "figure", title: "Marble statue of a kouros (youth)", artist: "Greek", date: "ca. 590–580 BCE", sourceUrl: "https://www.metmuseum.org/art/collection/search/253370" },
@@ -79,8 +75,6 @@ export const VISUAL_STATES: readonly VisualState[] = [
     artist: "EDGAR DEGAS",
     date: "1874",
     imageUrl: "/art/archive/gesture-environment.webp",
-    sourceLabel: "3 WORKS — THE MET CC0",
-    sourceUrl: "/llms.txt#record-002-gesture",
     credits: [
       { role: "environment", title: "The Dance Class", artist: "Edgar Degas", date: "1874", sourceUrl: "https://www.metmuseum.org/art/collection/search/438817" },
       { role: "figure", title: "The Little Fourteen-Year-Old Dancer", artist: "Edgar Degas", date: "modeled 1881; cast 1922", sourceUrl: "https://www.metmuseum.org/art/collection/search/196439" },
@@ -96,8 +90,6 @@ export const VISUAL_STATES: readonly VisualState[] = [
     artist: "VINCENT VAN GOGH",
     date: "1889",
     imageUrl: "/art/archive/afterimage-environment.webp",
-    sourceLabel: "3 WORKS — THE MET CC0",
-    sourceUrl: "/llms.txt#record-003-afterimage",
     credits: [
       { role: "environment", title: "Wheat Field with Cypresses", artist: "Vincent van Gogh", date: "1889", sourceUrl: "https://www.metmuseum.org/art/collection/search/436535" },
       { role: "figure", title: "Self-Portrait with a Straw Hat", artist: "Vincent van Gogh", date: "1887", sourceUrl: "https://www.metmuseum.org/art/collection/search/436532" },
@@ -988,7 +980,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
   const isInterfaceTarget = (target: EventTarget | null): boolean => (
-    target instanceof Element && target.closest("button, a") !== null
+    target instanceof Element && target.closest("button, a, dialog") !== null
   );
 
   const beginDirectDrag = (layer: LayerRecord): void => {

@@ -20,7 +20,11 @@ const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
 const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
 const sceneTitle = requireElement<HTMLSpanElement>("#scene-title");
 const sceneArtist = requireElement<HTMLSpanElement>("#scene-artist");
-const sourceCredit = requireElement<HTMLAnchorElement>("#source-credit");
+const creditsControl = requireElement<HTMLButtonElement>("#credits-control");
+const creditsDialog = requireElement<HTMLDialogElement>("#credits-dialog");
+const creditsClose = requireElement<HTMLButtonElement>("#credits-close");
+const creditsChapter = requireElement<HTMLSpanElement>("#credits-chapter");
+const creditsList = requireElement<HTMLOListElement>("#credits-list");
 const scrollScenes = [...document.querySelectorAll<HTMLElement>("[data-scroll-scene]")];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const coarsePointerQuery = window.matchMedia("(any-pointer: coarse)");
@@ -34,6 +38,7 @@ let scrollFrame = 0;
 let activeSceneIndex = -1;
 let actualView = false;
 let artworkInteracting = false;
+let activeVisualState: VisualState | null = null;
 
 function clampSceneIndex(index: number): number {
   return Math.max(0, Math.min(scrollScenes.length - 1, index));
@@ -100,11 +105,17 @@ function initialiseScroller(): void {
       easing,
     });
     snap.addElements(scrollScenes, { align: "start" });
-    if (artworkInteracting) lenis.stop();
+    syncScrollerState();
   }
 
   if (Math.abs(window.scrollY - preservedScroll) > 1) window.scrollTo(0, preservedScroll);
   syncSceneFromScroll(preservedScroll);
+}
+
+function syncScrollerState(): void {
+  if (!lenis) return;
+  if (document.hidden || artworkInteracting || creditsDialog.open) lenis.stop();
+  else lenis.start();
 }
 
 function scrollToScene(index: number): void {
@@ -120,14 +131,14 @@ function scrollToScene(index: number): void {
 }
 
 function updateRecord(state: VisualState): void {
+  activeVisualState = state;
   indexElement.textContent = `[${state.code}/003]`;
   labelElement.textContent = state.label;
   sceneStep.textContent = `${state.code} / ${state.label}`;
   sceneLine.textContent = state.line;
   sceneTitle.textContent = state.title;
   sceneArtist.textContent = `${state.artist} — ${state.date}`;
-  sourceCredit.textContent = state.sourceLabel;
-  sourceCredit.href = state.sourceUrl;
+  renderCredits(state);
   scrollIndex.textContent = state.index < scrollScenes.length
     ? String(state.index + 1).padStart(3, "0")
     : "END";
@@ -140,6 +151,41 @@ function updateRecord(state: VisualState): void {
     sceneLine.animate(keyframes, { duration: 620, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
     sceneArtist.animate(keyframes, { duration: 780, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
   }
+}
+
+function renderCredits(state: VisualState): void {
+  creditsChapter.textContent = `${state.code} / ${state.label}`;
+  creditsList.replaceChildren(...state.credits.map((credit, index) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    const role = document.createElement("span");
+    const work = document.createElement("span");
+    const title = document.createElement("span");
+    const metadata = document.createElement("span");
+    const arrow = document.createElement("span");
+
+    link.className = "credits-item";
+    link.href = credit.sourceUrl;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.setAttribute("aria-label", `${credit.title} by ${credit.artist}, ${credit.date} — view at The Met`);
+
+    role.className = "credits-item__role";
+    role.textContent = `${String(index + 1).padStart(2, "0")} / ${credit.role}`;
+    work.className = "credits-item__work";
+    title.className = "credits-item__title";
+    title.textContent = credit.title;
+    metadata.className = "credits-item__meta";
+    metadata.textContent = `${credit.artist} — ${credit.date}`;
+    arrow.className = "credits-item__arrow";
+    arrow.textContent = "↗";
+    arrow.setAttribute("aria-hidden", "true");
+
+    work.append(title, metadata);
+    link.append(role, work, arrow);
+    item.append(link);
+    return item;
+  }));
 }
 
 function updateMotionControl(): void {
@@ -157,9 +203,7 @@ function updateViewControl(): void {
 
 function updateArtworkInteractionState(active: boolean): void {
   artworkInteracting = active;
-  if (!lenis) return;
-  if (active || document.hidden) lenis.stop();
-  else lenis.start();
+  syncScrollerState();
 }
 
 async function initialiseVisual(): Promise<void> {
@@ -206,8 +250,38 @@ motionControl.addEventListener("click", () => {
   updateMotionControl();
 });
 
+creditsControl.addEventListener("click", () => {
+  if (!activeVisualState || creditsDialog.open) return;
+  renderCredits(activeVisualState);
+  creditsDialog.showModal();
+  creditsControl.setAttribute("aria-expanded", "true");
+  syncScrollerState();
+});
+
+function closeCreditsDialog(): void {
+  if (creditsDialog.open) creditsDialog.close();
+  creditsControl.setAttribute("aria-expanded", "false");
+  syncScrollerState();
+}
+
+creditsClose.addEventListener("click", closeCreditsDialog);
+
+creditsDialog.addEventListener("click", (event) => {
+  if (event.target !== creditsDialog) return;
+  const bounds = creditsDialog.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) closeCreditsDialog();
+});
+
+creditsDialog.addEventListener("close", () => {
+  creditsControl.setAttribute("aria-expanded", "false");
+  syncScrollerState();
+});
+
 window.addEventListener("keydown", (event) => {
   if (event.repeat) return;
+  if (creditsDialog.open) return;
   const target = event.target;
   const isControl = target instanceof Element
     && target.closest("a, button, input, textarea, select, [contenteditable='true']") !== null;
@@ -243,9 +317,7 @@ reducedMotionQuery.addEventListener("change", (event) => {
 coarsePointerQuery.addEventListener("change", initialiseScroller);
 
 document.addEventListener("visibilitychange", () => {
-  if (!lenis) return;
-  if (document.hidden || artworkInteracting) lenis.stop();
-  else lenis.start();
+  syncScrollerState();
 });
 
 window.addEventListener("pageshow", () => {
