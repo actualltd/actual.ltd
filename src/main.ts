@@ -20,6 +20,9 @@ const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
 const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
 const sceneTitle = requireElement<HTMLSpanElement>("#scene-title");
 const sceneArtist = requireElement<HTMLSpanElement>("#scene-artist");
+const companyControl = requireElement<HTMLButtonElement>("#company-control");
+const companyDialog = requireElement<HTMLDialogElement>("#company-dialog");
+const companyClose = requireElement<HTMLButtonElement>("#company-close");
 const creditsControl = requireElement<HTMLButtonElement>("#credits-control");
 const creditsDialog = requireElement<HTMLDialogElement>("#credits-dialog");
 const creditsClose = requireElement<HTMLButtonElement>("#credits-close");
@@ -114,7 +117,7 @@ function initialiseScroller(): void {
 
 function syncScrollerState(): void {
   if (!lenis) return;
-  if (document.hidden || artworkInteracting || creditsDialog.open) lenis.stop();
+  if (document.hidden || artworkInteracting || companyDialog.open || creditsDialog.open) lenis.stop();
   else lenis.start();
 }
 
@@ -253,35 +256,53 @@ motionControl.addEventListener("click", () => {
 creditsControl.addEventListener("click", () => {
   if (!activeVisualState || creditsDialog.open) return;
   renderCredits(activeVisualState);
-  creditsDialog.showModal();
-  creditsControl.setAttribute("aria-expanded", "true");
-  syncScrollerState();
+  openDialog(creditsDialog, creditsControl);
 });
 
-function closeCreditsDialog(): void {
-  if (creditsDialog.open) creditsDialog.close();
-  creditsControl.setAttribute("aria-expanded", "false");
+function openDialog(dialog: HTMLDialogElement, control: HTMLButtonElement): void {
+  dialog.showModal();
+  control.setAttribute("aria-expanded", "true");
   syncScrollerState();
 }
 
-creditsClose.addEventListener("click", closeCreditsDialog);
-
-creditsDialog.addEventListener("click", (event) => {
-  if (event.target !== creditsDialog) return;
-  const bounds = creditsDialog.getBoundingClientRect();
-  const outside = event.clientX < bounds.left || event.clientX > bounds.right
-    || event.clientY < bounds.top || event.clientY > bounds.bottom;
-  if (outside) closeCreditsDialog();
-});
-
-creditsDialog.addEventListener("close", () => {
-  creditsControl.setAttribute("aria-expanded", "false");
+function closeDialog(dialog: HTMLDialogElement, control: HTMLButtonElement): void {
+  if (dialog.open) dialog.close();
+  control.setAttribute("aria-expanded", "false");
   syncScrollerState();
+}
+
+function bindDialogDismissal(
+  dialog: HTMLDialogElement,
+  control: HTMLButtonElement,
+  closeControl: HTMLButtonElement,
+): void {
+  closeControl.addEventListener("click", () => closeDialog(dialog, control));
+
+  dialog.addEventListener("click", (event) => {
+    if (event.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    const outside = event.clientX < bounds.left || event.clientX > bounds.right
+      || event.clientY < bounds.top || event.clientY > bounds.bottom;
+    if (outside) closeDialog(dialog, control);
+  });
+
+  dialog.addEventListener("close", () => {
+    control.setAttribute("aria-expanded", "false");
+    syncScrollerState();
+  });
+}
+
+companyControl.addEventListener("click", () => {
+  if (companyDialog.open) return;
+  openDialog(companyDialog, companyControl);
 });
+
+bindDialogDismissal(companyDialog, companyControl, companyClose);
+bindDialogDismissal(creditsDialog, creditsControl, creditsClose);
 
 window.addEventListener("keydown", (event) => {
   if (event.repeat) return;
-  if (creditsDialog.open) return;
+  if (companyDialog.open || creditsDialog.open) return;
   const target = event.target;
   const isControl = target instanceof Element
     && target.closest("a, button, input, textarea, select, [contenteditable='true']") !== null;

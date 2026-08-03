@@ -178,9 +178,9 @@ const EFFECT_LAYER = 3;
 const MAX_DPR = 1.35;
 const PAGE_EDGE_INSET = 24;
 const SCALE_LIMITS: Record<LayerRole, { minScale: number; maxScale: number }> = {
-  environment: { minScale: 0.94, maxScale: 1.06 },
-  figure: { minScale: 0.82, maxScale: 1.20 },
-  object: { minScale: 0.72, maxScale: 1.32 },
+  environment: { minScale: 0.48, maxScale: 1.80 },
+  figure: { minScale: 0.38, maxScale: 2.35 },
+  object: { minScale: 0.28, maxScale: 2.80 },
 };
 
 const sharedDither = {
@@ -590,6 +590,21 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       : -layer.baseY;
   };
 
+  const pageSafeMaxScale = (layer: LayerRecord): number => {
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+    const aspect = width / height;
+    const marginX = (PAGE_EDGE_INSET / width) * aspect * 2;
+    const marginY = (PAGE_EDGE_INSET / height) * 2;
+    const half = layerHalfExtents(layer);
+    const currentScale = Math.max(layer.userScale, 0.001);
+    const baseHalfX = half.x / currentScale;
+    const baseHalfY = half.y / currentScale;
+    const horizontalLimit = baseHalfX > 0 ? (aspect - marginX) / baseHalfX : layer.maxScale;
+    const verticalLimit = baseHalfY > 0 ? (1 - marginY) / baseHalfY : layer.maxScale;
+    return Math.max(layer.minScale, Math.min(layer.maxScale, horizontalLimit, verticalLimit));
+  };
+
   const layerScreenBounds = (layer: LayerRecord): { left: number; top: number; right: number; bottom: number } => {
     const width = Math.max(stage.clientWidth, 1);
     const height = Math.max(stage.clientHeight, 1);
@@ -643,6 +658,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         layer.baseScaleX = meshWidth;
         layer.baseScaleY = meshHeight;
         layer.mesh.rotation.z = (((compact ? layerConfig.mobile.rotation : layerConfig.layout.rotation) ?? 0) * Math.PI) / 180;
+        layer.userScale = clamp(layer.userScale, layer.minScale, pageSafeMaxScale(layer));
         constrainLayerToPage(layer);
         layer.mesh.position.x = layer.baseX + layer.userOffsetX;
         layer.mesh.position.y = layer.baseY + layer.userOffsetY;
@@ -930,7 +946,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const scaleLayer = (layer: LayerRecord, scale: number): void => {
-    layer.userScale = clamp(scale, layer.minScale, layer.maxScale);
+    layer.userScale = clamp(scale, layer.minScale, pageSafeMaxScale(layer));
     constrainLayerToPage(layer);
     syncManipulationDataset(layer);
     requestRender();
@@ -1089,7 +1105,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       event.stopImmediatePropagation();
       setResizingArtwork(true);
       scheduleResizeEnd();
-      scaleLayer(layer, layer.userScale * Math.exp(-event.deltaY * 0.004));
+      scaleLayer(layer, layer.userScale * Math.exp(-event.deltaY * 0.006));
       setHoveredLayer(layer);
     } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 0.72 && Math.abs(event.deltaX) > 1) {
       event.preventDefault();
@@ -1123,7 +1139,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     if (!gestureLayer) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    scaleLayer(gestureLayer, gestureStartScale * event.scale);
+    scaleLayer(gestureLayer, gestureStartScale * Math.pow(event.scale, 1.18));
   };
 
   const onGestureEnd = (event: Event): void => {

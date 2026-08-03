@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#eee8dc" />
-    <meta name="description" content="ACTUAL presents Signal Archive: form, gesture, and afterimage." />
+    <meta name="description" content="Official Bangkok website of ACTUAL LTD. Presenting Signal Archive: form, gesture, and afterimage." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="ACTUAL — Signal Archive" />
-    <meta property="og:description" content="Signal Archive: three public-domain art records in form, gesture, and afterimage." />
+    <meta property="og:title" content="ACTUAL LTD. — Signal Archive" />
+    <meta property="og:description" content="Official Bangkok website of ACTUAL LTD. Three public-domain art records in form, gesture, and afterimage." />
     <meta property="og:url" content="https://actual.ltd/" />
     <meta property="og:image" content="https://actual.ltd/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -16,7 +16,23 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>ACTUAL — Signal Archive</title>
+    <title>ACTUAL LTD. — Signal Archive</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "ACTUAL LTD.",
+        "url": "https://actual.ltd/",
+        "email": "hello@actual.ltd",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "25 Chidlom, Ploenchit, Lumpini, Patumwan",
+          "addressLocality": "Bangkok",
+          "postalCode": "10330",
+          "addressCountry": "TH"
+        }
+      }
+    </script>
   </head>
   <body>
     <main class="site-shell" aria-label="ACTUAL company page">
@@ -40,7 +56,7 @@
         </div>
       </header>
 
-      <h1 class="visually-hidden">ACTUAL</h1>
+      <h1 class="visually-hidden">ACTUAL LTD.</h1>
 
       <section class="identity" aria-label="Artwork record" aria-live="polite">
         <div class="art-plate" aria-hidden="true">
@@ -72,10 +88,17 @@
 
       <footer class="footer">
         <div class="edition">
-          <div class="actual-mark">
-            <span>ACTUAL</span>
-            <span class="company-description">SIGNAL ARCHIVE</span>
-          </div>
+          <button
+            class="actual-mark"
+            id="company-control"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="company-dialog"
+            aria-expanded="false"
+          >
+            <span>ACTUAL LTD.</span>
+            <span class="company-description">BANGKOK / TH ↗</span>
+          </button>
           <button
             class="credits-control"
             id="credits-control"
@@ -92,6 +115,36 @@
           <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>
         </a>
       </footer>
+
+      <dialog class="company-dialog" id="company-dialog" aria-labelledby="company-title">
+        <div class="company-dialog__header">
+          <div>
+            <span class="company-dialog__eyebrow">LEGAL ENTITY / COMPANY RECORD</span>
+            <h2 id="company-title">ACTUAL LTD.</h2>
+          </div>
+          <button class="company-close" id="company-close" type="button" aria-label="Close company information">
+            CLOSE—×
+          </button>
+        </div>
+        <div class="company-dialog__body">
+          <div class="company-field">
+            <span class="company-field__label">REGISTERED OFFICE</span>
+            <address>
+              25 CHIDLOM, PLOENCHIT<br />
+              LUMPINI, PATUMWAN<br />
+              BANGKOK 10330, THAILAND
+            </address>
+          </div>
+          <div class="company-field">
+            <span class="company-field__label">CONTACT</span>
+            <a href="mailto:hello@actual.ltd">hello@actual.ltd <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+        <div class="company-dialog__footer">
+          <span>ACTUAL.LTD</span>
+          <span>BANGKOK / TH</span>
+        </div>
+      </dialog>
 
       <dialog class="credits-dialog" id="credits-dialog" aria-labelledby="credits-title">
         <div class="credits-dialog__header">

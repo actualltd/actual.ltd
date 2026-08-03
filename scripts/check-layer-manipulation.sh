@@ -45,20 +45,55 @@ result="$(browser eval --stdin <<'EVALEOF'
   pointer("pointerup", 1210, 100);
   const dragged = { role: engine.dataset.activeLayer, offset: engine.dataset.layerOffset, bounds: engine.dataset.layerBounds };
 
-  window.dispatchEvent(new WheelEvent("wheel", { clientX: 1210, clientY: 100, deltaY: -85, ctrlKey: true, cancelable: true }));
+  window.dispatchEvent(new WheelEvent("wheel", { clientX: 1210, clientY: 100, deltaY: -170, ctrlKey: true, cancelable: true }));
   await new Promise((resolve) => setTimeout(resolve, 80));
   const pinched = { scale: engine.dataset.layerScale, bounds: engine.dataset.layerBounds };
+  window.dispatchEvent(new WheelEvent("wheel", { clientX: 1210, clientY: 100, deltaY: 360, ctrlKey: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const shrunk = { scale: engine.dataset.layerScale, bounds: engine.dataset.layerBounds };
   const resizeScroll = new WheelEvent("wheel", { clientX: 1210, clientY: 100, deltaY: 90, cancelable: true });
   window.dispatchEvent(resizeScroll);
   const resizeLock = { active: document.documentElement.dataset.artResizing, blocked: resizeScroll.defaultPrevented };
 
-  window.dispatchEvent(new MouseEvent("dblclick", { clientX: 1210, clientY: 100, bubbles: true }));
+  const [shrinkLeft, shrinkTop, shrinkRight, shrinkBottom] = String(engine.dataset.layerBounds).split(",").map(Number);
+  window.dispatchEvent(new MouseEvent("dblclick", {
+    clientX: (shrinkLeft + shrinkRight) / 2,
+    clientY: (shrinkTop + shrinkBottom) / 2,
+    bubbles: true,
+  }));
   await new Promise((resolve) => setTimeout(resolve, 900));
   const reset = { scale: engine.dataset.layerScale, offset: engine.dataset.layerOffset, resizing: document.documentElement.dataset.artResizing };
 
+  const [resetLeft, resetTop, resetRight, resetBottom] = String(engine.dataset.layerBounds).split(",").map(Number);
+  const gestureX = (resetLeft + resetRight) / 2;
+  const gestureY = (resetTop + resetBottom) / 2;
+  const gesture = (type, scale) => {
+    const gestureEvent = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(gestureEvent, {
+      scale: { value: scale },
+      clientX: { value: gestureX },
+      clientY: { value: gestureY },
+    });
+    window.dispatchEvent(gestureEvent);
+  };
+  gesture("gesturestart", 1);
+  gesture("gesturechange", 1.8);
+  gesture("gestureend", 1.8);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const nativeGesture = { scale: engine.dataset.layerScale, bounds: engine.dataset.layerBounds };
+
+  const [gestureLeft, gestureTop, gestureRight, gestureBottom] = String(engine.dataset.layerBounds).split(",").map(Number);
+  window.dispatchEvent(new MouseEvent("dblclick", {
+    clientX: (gestureLeft + gestureRight) / 2,
+    clientY: (gestureTop + gestureBottom) / 2,
+    bubbles: true,
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  const gestureReset = { scale: engine.dataset.layerScale, offset: engine.dataset.layerOffset };
+
   window.dispatchEvent(new WheelEvent("wheel", { clientX: 980, clientY: 485, deltaX: 52, deltaY: 3, cancelable: true }));
   const trackpad = { offset: engine.dataset.layerOffset };
-  return { ok: true, dragged, pinched, resizeLock, reset, trackpad };
+  return { ok: true, dragged, pinched, shrunk, resizeLock, reset, nativeGesture, gestureReset, trackpad };
 })()
 EVALEOF
 )"
@@ -78,20 +113,27 @@ if ACTUAL_LAYER_RESULT="$result" node -e '
     && Math.abs(dragged[0]) > 0.4
     && Math.abs(dragged[1]) > 0.7
     && withinPage(result.dragged.bounds)
-    && Number(result.pinched.scale) > 1
-    && Number(result.pinched.scale) <= 1.32
+    && Number(result.pinched.scale) > 2.4
+    && Number(result.pinched.scale) <= 2.8
     && withinPage(result.pinched.bounds)
+    && Number(result.shrunk.scale) >= 0.28
+    && Number(result.shrunk.scale) < 0.45
+    && withinPage(result.shrunk.bounds)
     && result.resizeLock.active === "true"
     && result.resizeLock.blocked === true
     && Number(result.reset.scale) === 1
     && result.reset.resizing === undefined
     && Math.abs(reset[0]) < 0.001
     && Math.abs(reset[1]) < 0.001
+    && Number(result.nativeGesture.scale) > 1.8
+    && Number(result.nativeGesture.scale) <= 2.8
+    && withinPage(result.nativeGesture.bounds)
+    && Number(result.gestureReset.scale) === 1
     && Math.abs(trackpad[0]) > 0.02
     && Math.abs(trackpad[0]) <= 0.2;
   process.exit(passed ? 0 : 1);
 '; then
-  echo "PASS: layers drag across the page, stay on-screen, pinch, reset, and trackpad-slide"
+  echo "PASS: layers drag across the page, zoom generously in both directions, reset, and trackpad-slide"
   exit 0
 fi
 

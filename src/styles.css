@@ -482,6 +482,9 @@ html[data-art-active] .plate-gesture {
 .view-control:focus-visible,
 .motion-control:focus-visible,
 .email:focus-visible,
+.actual-mark:focus-visible,
+.company-close:focus-visible,
+.company-field a:focus-visible,
 .credits-control:focus-visible,
 .credits-close:focus-visible,
 .credits-item:focus-visible {
@@ -510,16 +513,24 @@ html[data-art-active] .plate-gesture {
 }
 
 .actual-mark {
+  appearance: none;
   position: relative;
   display: flex;
   width: max-content;
+  padding: 0;
   align-items: baseline;
   gap: 0.72rem;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
   font-family: "Geist Variable", "Helvetica Neue", sans-serif;
   font-size: clamp(1rem, 1.25vw, 1.25rem);
   font-weight: 610;
   line-height: 1;
   letter-spacing: -0.035em;
+  text-align: left;
+  cursor: pointer;
 }
 
 .company-description {
@@ -529,6 +540,12 @@ html[data-art-active] .plate-gesture {
   font-weight: 590;
   letter-spacing: 0.08em;
   opacity: 0.62;
+  transition: opacity 180ms ease;
+}
+
+.actual-mark:hover .company-description,
+.actual-mark:focus-visible .company-description {
+  opacity: 1;
 }
 
 .credits-control,
@@ -573,6 +590,7 @@ html[data-art-active] .plate-gesture {
   color: var(--ink);
 }
 
+.company-dialog,
 .credits-dialog {
   position: fixed;
   inset: auto auto max(var(--edge), env(safe-area-inset-bottom)) max(var(--edge), env(safe-area-inset-left));
@@ -591,11 +609,13 @@ html[data-art-active] .plate-gesture {
   text-transform: uppercase;
 }
 
+.company-dialog[open],
 .credits-dialog[open] {
   display: grid;
   animation: credits-enter 520ms var(--ease-out) both;
 }
 
+.company-dialog::backdrop,
 .credits-dialog::backdrop {
   background: color-mix(in srgb, var(--ink) 17%, transparent);
 }
@@ -611,6 +631,101 @@ html[data-art-active] .plate-gesture {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+}
+
+.company-dialog {
+  width: min(30rem, calc(100vw - (var(--edge) * 2)));
+}
+
+.company-dialog__header,
+.company-dialog__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.company-dialog__header {
+  padding: 1.15rem 1.2rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.company-dialog__eyebrow,
+.company-dialog__footer,
+.company-field__label {
+  font-size: 0.58rem;
+  font-weight: 580;
+  line-height: 1.35;
+  letter-spacing: 0.09em;
+}
+
+.company-dialog__eyebrow {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+}
+
+.company-dialog h2 {
+  margin: 0;
+  font-family: "Geist Variable", "Helvetica Neue", sans-serif;
+  font-size: clamp(1.7rem, 3.1vw, 2.6rem);
+  font-weight: 540;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.company-close {
+  appearance: none;
+  padding: 0.1rem 0 0.4rem 0.4rem;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.company-dialog__body {
+  display: grid;
+  gap: 0;
+}
+
+.company-field {
+  display: grid;
+  min-height: 6.4rem;
+  padding: 1rem 1.2rem;
+  grid-template-columns: 8rem 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.company-field + .company-field {
+  min-height: auto;
+  border-top: 1px solid var(--hairline);
+}
+
+.company-field__label {
+  color: var(--muted);
+}
+
+.company-field address,
+.company-field a {
+  color: inherit;
+  font-family: "Geist Variable", "Helvetica Neue", sans-serif;
+  font-size: 0.96rem;
+  font-style: normal;
+  font-weight: 570;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+  text-decoration: none;
+}
+
+.company-dialog__footer {
+  padding: 0.65rem 1.2rem;
+  color: var(--muted);
+  border-top: 1px solid var(--hairline);
 }
 
 .credits-dialog__header {
@@ -853,6 +968,7 @@ html[data-art-active] .plate-gesture {
     min-width: 7.2rem;
   }
 
+  .company-dialog,
   .credits-dialog {
     inset: auto 1rem max(1rem, env(safe-area-inset-bottom)) 1rem;
     width: auto;
@@ -861,6 +977,21 @@ html[data-art-active] .plate-gesture {
 
   .credits-dialog__header {
     padding: 1rem;
+  }
+
+  .company-dialog__header {
+    padding: 1rem;
+  }
+
+  .company-dialog__footer {
+    padding: 0.62rem 1rem;
+  }
+
+  .company-field {
+    min-height: 5.7rem;
+    padding: 0.9rem 1rem;
+    grid-template-columns: 6rem 1fr;
+    gap: 0.7rem;
   }
 
   .credits-dialog__chapter,
@@ -879,6 +1010,18 @@ html[data-art-active] .plate-gesture {
     min-width: 10.2rem;
     min-height: 2.6rem;
     padding: 0 0.52rem 0.5rem 0;
+  }
+}
+
+@media (max-width: 370px) {
+  .edition,
+  .email {
+    min-width: 8.8rem;
+  }
+
+  .actual-mark {
+    gap: 0.42rem;
+    font-size: 0.9rem;
   }
 }
 
