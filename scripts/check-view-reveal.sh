@@ -21,16 +21,23 @@ browser wait 1200 >/dev/null
 result="$(browser eval --stdin <<'EVALEOF'
 (async () => {
   const view = document.querySelector("#view-control");
+  const motion = document.querySelector("#motion-control");
   const engine = document.querySelector(".art-engine");
-  if (!(view instanceof HTMLButtonElement) || !(engine instanceof HTMLElement)) return { ok: false };
+  if (!(view instanceof HTMLButtonElement) || !(motion instanceof HTMLButtonElement) || !(engine instanceof HTMLElement)) return { ok: false };
   const initial = { pressed: view.getAttribute("aria-pressed"), text: view.textContent?.trim(), view: engine.dataset.view };
   view.click();
   await new Promise((resolve) => setTimeout(resolve, 550));
   const actual = { pressed: view.getAttribute("aria-pressed"), text: view.textContent?.trim(), view: engine.dataset.view };
   window.scrollTo(0, innerHeight);
   await new Promise((resolve) => setTimeout(resolve, 1000));
-  const reset = { pressed: view.getAttribute("aria-pressed"), text: view.textContent?.trim(), view: engine.dataset.view };
-  return { ok: true, initial, actual, reset };
+  const persisted = { pressed: view.getAttribute("aria-pressed"), text: view.textContent?.trim(), view: engine.dataset.view };
+  motion.click();
+  window.scrollTo(0, innerHeight * 2);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const motionOffDuring = { transitioning: engine.dataset.transitioning, motion: motion.getAttribute("aria-pressed") };
+  await new Promise((resolve) => setTimeout(resolve, 1600));
+  const motionOffSettled = { transitioning: engine.dataset.transitioning, scene: engine.dataset.scene, view: engine.dataset.view };
+  return { ok: true, initial, actual, persisted, motionOffDuring, motionOffSettled };
 })()
 EVALEOF
 )"
@@ -43,12 +50,17 @@ if ACTUAL_VIEW_RESULT="$result" node -e '
     && result.actual.pressed === "true"
     && result.actual.text === "VIEW—ACTUAL"
     && result.actual.view === "actual"
-    && result.reset.pressed === "false"
-    && result.reset.text === "VIEW—DITHER"
-    && result.reset.view === "dither";
+    && result.persisted.pressed === "true"
+    && result.persisted.text === "VIEW—ACTUAL"
+    && result.persisted.view === "actual"
+    && result.motionOffDuring.transitioning === "true"
+    && result.motionOffDuring.motion === "false"
+    && result.motionOffSettled.transitioning === "false"
+    && result.motionOffSettled.scene === "2"
+    && result.motionOffSettled.view === "actual";
   process.exit(passed ? 0 : 1);
 '; then
-  echo "PASS: full-color view is keyboard/touch equivalent and resets on record change"
+  echo "PASS: the selected view persists and MOTION—OFF keeps a short record transition"
   exit 0
 fi
 

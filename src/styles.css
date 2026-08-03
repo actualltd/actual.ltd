@@ -51,6 +51,14 @@ body {
   min-width: 320px;
 }
 
+html[data-art-active] .site-shell {
+  cursor: grab;
+}
+
+html[data-art-dragging] .site-shell {
+  cursor: grabbing;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;
@@ -214,8 +222,7 @@ button {
 }
 
 .view-control,
-.motion-control,
-.actual-mark {
+.motion-control {
   appearance: none;
   padding: 0;
   border: 0;
@@ -352,6 +359,22 @@ button {
   opacity: 0.42;
 }
 
+.plate-gesture {
+  position: absolute;
+  right: 0.48rem;
+  bottom: 0.42rem;
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  font-size: 0.54rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  opacity: 0.34;
+  transition: opacity 180ms ease;
+}
+
+html[data-art-active] .plate-gesture {
+  opacity: 0.82;
+}
+
 .scene-copy {
   position: absolute;
   top: calc(50% + (var(--plate-h) / 2) + clamp(0.65rem, 1.5vh, 1rem));
@@ -458,7 +481,6 @@ button {
 
 .view-control:focus-visible,
 .motion-control:focus-visible,
-.actual-mark:focus-visible,
 .email:focus-visible,
 .source-credit:focus-visible {
   outline: 1px solid currentColor;
@@ -504,14 +526,7 @@ button {
   font-size: 0.44em;
   font-weight: 590;
   letter-spacing: 0.08em;
-  opacity: 0;
-  transform: translateX(-0.32rem);
-  transition: opacity 300ms ease, transform 560ms var(--ease-out);
-}
-
-.actual-mark:is(:hover, :focus-visible, .is-revealed) .company-description {
   opacity: 0.62;
-  transform: translateX(0);
 }
 
 .source-credit,
@@ -618,6 +633,12 @@ button {
     display: none;
   }
 
+  .plate-gesture {
+    right: 0.4rem;
+    bottom: 0.35rem;
+    font-size: 0.5rem;
+  }
+
   .scene-copy {
     top: calc(50% + (var(--plate-h) / 2) + 0.65rem);
     gap: 0.2rem;
@@ -653,13 +674,6 @@ button {
   .edition {
     min-width: 10.2rem;
     padding: 0 0 0.5rem 0.52rem;
-  }
-
-  .company-description {
-    position: absolute;
-    bottom: 1.15rem;
-    left: 0;
-    width: max-content;
   }
 
   .source-credit {

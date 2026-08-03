@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+url="${1:-http://127.0.0.1:5174/}"
+session="actual-layer-manipulation"
+
+browser() {
+  npx -y agent-browser --session "$session" "$@"
+}
+
+cleanup() {
+  browser close >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+browser open "$url" >/dev/null
+browser set viewport 1280 720 >/dev/null
+browser reload >/dev/null
+browser wait --load networkidle >/dev/null
+browser wait 1200 >/dev/null
+
+result="$(browser eval --stdin <<'EVALEOF'
+(async () => {
+  window.scrollTo(0, 0);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const engine = document.querySelector(".art-engine");
+  if (!(engine instanceof HTMLElement)) return { ok: false };
+
+  const pointer = (type, x, y, buttons = 0) => window.dispatchEvent(new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId: 7,
+    pointerType: "mouse",
+    isPrimary: true,
+    button: 0,
+    buttons,
+    clientX: x,
+    clientY: y,
+  }));
+
+  pointer("pointermove", 980, 485);
+  pointer("pointerdown", 980, 485, 1);
+  pointer("pointermove", 1040, 445, 1);
+  pointer("pointerup", 1040, 445);
+  const dragged = { role: engine.dataset.activeLayer, offset: engine.dataset.layerOffset };
+
+  window.dispatchEvent(new WheelEvent("wheel", { clientX: 1040, clientY: 445, deltaY: -85, ctrlKey: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const pinched = { scale: engine.dataset.layerScale };
+
+  window.dispatchEvent(new MouseEvent("dblclick", { clientX: 1040, clientY: 445, bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 520));
+  const reset = { scale: engine.dataset.layerScale, offset: engine.dataset.layerOffset };
+
+  window.dispatchEvent(new WheelEvent("wheel", { clientX: 980, clientY: 485, deltaX: 52, deltaY: 3, cancelable: true }));
+  const trackpad = { offset: engine.dataset.layerOffset };
+  return { ok: true, dragged, pinched, reset, trackpad };
+})()
+EVALEOF
+)"
+
+if ACTUAL_LAYER_RESULT="$result" node -e '
+  const result = JSON.parse(process.env.ACTUAL_LAYER_RESULT);
+  const parseOffset = (value) => String(value).split(",").map(Number);
+  const dragged = parseOffset(result.dragged.offset);
+  const reset = parseOffset(result.reset.offset);
+  const trackpad = parseOffset(result.trackpad.offset);
+  const passed = result.ok
+    && result.dragged.role === "object"
+    && Math.abs(dragged[0]) > 0.02
+    && Math.abs(dragged[0]) <= 0.2
+    && Number(result.pinched.scale) > 1
+    && Number(result.pinched.scale) <= 1.32
+    && Number(result.reset.scale) === 1
+    && Math.abs(reset[0]) < 0.001
+    && Math.abs(reset[1]) < 0.001
+    && Math.abs(trackpad[0]) > 0.02
+    && Math.abs(trackpad[0]) <= 0.2;
+  process.exit(passed ? 0 : 1);
+'; then
+  echo "PASS: layers drag, pinch, reset, and trackpad-slide within their limits"
+  exit 0
+fi
+
+echo "FAIL: layer manipulation is inconsistent: $result"
+exit 1

@@ -16,7 +16,6 @@ const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const viewControl = requireElement<HTMLButtonElement>("#view-control");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
 const scrollIndex = requireElement<HTMLSpanElement>("#scroll-index");
-const wordmark = requireElement<HTMLButtonElement>("#actual-wordmark");
 const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
 const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
 const sceneTitle = requireElement<HTMLSpanElement>("#scene-title");
@@ -47,10 +46,6 @@ function selectScene(index: number): void {
   const nextIndex = clampSceneIndex(index);
   if (nextIndex === activeSceneIndex) return;
   activeSceneIndex = nextIndex;
-  if (actualView) {
-    actualView = false;
-    updateViewControl();
-  }
   visual?.setScene(nextIndex);
 }
 
@@ -163,6 +158,7 @@ async function initialiseVisual(): Promise<void> {
     const { createVisual } = await import("./visual");
     visual = createVisual(visualLayer, {
       motionEnabled,
+      reducedMotion: reducedMotionQuery.matches,
       onStateChange: updateRecord,
       onUnavailable: () => {
         visualLayer.classList.add("is-unavailable");
@@ -225,13 +221,8 @@ window.addEventListener("keydown", (event) => {
   scrollToScene(nextIndex);
 });
 
-wordmark.addEventListener("click", () => {
-  const expanded = wordmark.getAttribute("aria-expanded") === "true";
-  wordmark.setAttribute("aria-expanded", String(!expanded));
-  wordmark.classList.toggle("is-revealed", !expanded);
-});
-
 reducedMotionQuery.addEventListener("change", (event) => {
+  visual?.setReducedMotion(event.matches);
   if (userMotionPreference === null) {
     motionEnabled = !event.matches;
     updateMotionControl();
