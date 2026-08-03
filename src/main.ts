@@ -13,6 +13,7 @@ function requireElement<T extends HTMLElement>(selector: string): T {
 const visualLayer = requireElement<HTMLDivElement>("#visual-layer");
 const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
+const viewControl = requireElement<HTMLButtonElement>("#view-control");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
 const scrollIndex = requireElement<HTMLSpanElement>("#scroll-index");
 const wordmark = requireElement<HTMLButtonElement>("#actual-wordmark");
@@ -32,6 +33,7 @@ let lenis: Lenis | null = null;
 let snap: LenisSnap | null = null;
 let scrollFrame = 0;
 let activeSceneIndex = -1;
+let actualView = false;
 
 function clampSceneIndex(index: number): number {
   return Math.max(0, Math.min(scrollScenes.length - 1, index));
@@ -45,6 +47,10 @@ function selectScene(index: number): void {
   const nextIndex = clampSceneIndex(index);
   if (nextIndex === activeSceneIndex) return;
   activeSceneIndex = nextIndex;
+  if (actualView) {
+    actualView = false;
+    updateViewControl();
+  }
   visual?.setScene(nextIndex);
 }
 
@@ -145,6 +151,13 @@ function updateMotionControl(): void {
   visual?.setMotionEnabled(motionEnabled);
 }
 
+function updateViewControl(): void {
+  viewControl.textContent = actualView ? "VIEW—ACTUAL" : "VIEW—DITHER";
+  viewControl.setAttribute("aria-pressed", String(actualView));
+  viewControl.setAttribute("aria-label", actualView ? "Show dithered artwork" : "Show full-color artwork");
+  visual?.setActualView(actualView);
+}
+
 async function initialiseVisual(): Promise<void> {
   try {
     const { createVisual } = await import("./visual");
@@ -157,10 +170,13 @@ async function initialiseVisual(): Promise<void> {
         motionControl.disabled = true;
         motionControl.textContent = "MOTION—OFF";
         motionControl.setAttribute("aria-pressed", "false");
+        viewControl.disabled = true;
       },
       onAvailable: () => {
         motionControl.disabled = false;
+        viewControl.disabled = false;
         updateMotionControl();
+        updateViewControl();
       },
     });
     visual.setScene(Math.max(activeSceneIndex, 0));
@@ -169,8 +185,14 @@ async function initialiseVisual(): Promise<void> {
     motionControl.disabled = true;
     motionControl.textContent = "MOTION—OFF";
     motionControl.setAttribute("aria-pressed", "false");
+    viewControl.disabled = true;
   }
 }
+
+viewControl.addEventListener("click", () => {
+  actualView = !actualView;
+  updateViewControl();
+});
 
 motionControl.addEventListener("click", () => {
   motionEnabled = !motionEnabled;
@@ -237,5 +259,6 @@ window.addEventListener("pagehide", (event) => {
 }, { once: true });
 
 updateMotionControl();
+updateViewControl();
 initialiseScroller();
 requestAnimationFrame(() => void initialiseVisual());

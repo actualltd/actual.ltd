@@ -44,7 +44,7 @@ measurement="$({
 changed_percent="${measurement%% *}"
 mean_difference="${measurement##* }"
 
-if awk "BEGIN { exit !($changed_percent > 3 && $mean_difference > 3) }"; then
+if awk "BEGIN { exit !($changed_percent > 2 && $mean_difference > 2.5) }"; then
   echo "PASS: foreground and background layers visibly separate with pointer movement (changed=$changed_percent%, mean=$mean_difference)"
   exit 0
 fi

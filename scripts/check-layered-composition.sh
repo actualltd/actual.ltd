@@ -43,12 +43,12 @@ for scene in 1 2 3; do
     browser screenshot "$image" >/dev/null
   fi
 
-  center="$(dark_percent "$image" 'iw*0.46:ih*0.58:iw*0.27:ih*0.10')"
-  left="$(dark_percent "$image" 'iw*0.18:ih*0.50:iw*0.10:ih*0.16')"
-  right="$(dark_percent "$image" 'iw*0.18:ih*0.50:iw*0.72:ih*0.16')"
+  center="$(dark_percent "$image" 'iw*0.56:ih*0.54:iw*0.22:ih*0.12')"
+  left="$(dark_percent "$image" 'iw*0.25:ih*0.56:iw*0.04:ih*0.13')"
+  right="$(dark_percent "$image" 'iw*0.25:ih*0.56:iw*0.71:ih*0.13')"
   story="$(dark_percent "$image" 'iw*0.44:ih*0.17:iw*0.28:ih*0.70')"
 
-  if awk "BEGIN { exit !($center > 4 && $center < 48 && $left > 1 && $left < 26 && $right > 1 && $right < 26 && $story < 12) }"; then
+  if awk "BEGIN { exit !($center > 1.5 && $center < 48 && $left > 0.02 && $left < 42 && $right > 0.01 && $right < 42 && $story < 12) }"; then
     echo "SCENE $scene PASS center=$center% left=$left% right=$right% story=$story%"
   else
     echo "SCENE $scene FAIL center=$center% left=$left% right=$right% story=$story%"

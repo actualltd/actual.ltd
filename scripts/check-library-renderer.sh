@@ -20,7 +20,7 @@ browser wait 1400 >/dev/null
 
 result="$(browser eval --stdin <<'EVALEOF'
 (() => {
-  const engine = document.querySelector('[data-renderer="three-paper-motion"]');
+  const engine = document.querySelector('[data-renderer="three-paper-signal-archive"]');
   const canvases = [...document.querySelectorAll('.art-engine canvas')];
   const canvas = canvases[0];
   return {
@@ -30,7 +30,8 @@ result="$(browser eval --stdin <<'EVALEOF'
     webgl2: Boolean(canvas?.getContext('webgl2')),
     depthPlanes: Number(engine?.getAttribute('data-depth-planes')),
     ditherProvider: engine?.getAttribute('data-dither-provider'),
-    motionProvider: engine?.getAttribute('data-motion-provider'),
+    layerProcessing: engine?.getAttribute('data-layer-processing'),
+    loadedScenes: Number(engine?.getAttribute('data-loaded-scenes')),
   };
 })()
 EVALEOF
@@ -44,10 +45,11 @@ if ACTUAL_RENDERER_RESULT="$result" node -e '
     && result.webgl2
     && result.depthPlanes === 4
     && result.ditherProvider === "paper-shaders"
-    && result.motionProvider === "motion";
+    && result.layerProcessing === "semantic-render-targets"
+    && result.loadedScenes === 3;
   process.exit(passed ? 0 : 1);
 '; then
-  echo "PASS: one Three.js WebGL2 canvas composes four depth planes, with Paper Shaders dithering and Motion parallax"
+  echo "PASS: one Three.js WebGL2 canvas composes semantic render targets with Paper Shaders dithering"
   exit 0
 fi
 

@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#e7e0d4" />
-    <meta name="description" content="ACTUAL is an independent company. Three studies in force, motion, and presence." />
+    <meta name="theme-color" content="#eee8dc" />
+    <meta name="description" content="ACTUAL is an independent company. Signal Archive: form, gesture, and afterimage." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="ACTUAL — Independent Company" />
-    <meta property="og:description" content="Three studies in force, motion, and presence by ACTUAL." />
+    <meta property="og:description" content="Signal Archive: three public-domain art records in form, gesture, and afterimage." />
     <meta property="og:url" content="https://actual.ltd/" />
     <meta property="og:image" content="https://actual.ltd/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="A mixed-dither collage of Hokusai's wave, a Sharaku actor, and a conch shell." />
+    <meta property="og:image:alt" content="ACTUAL Signal Archive: a warm-bone editorial collage of public-domain artworks from The Met." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -25,25 +25,39 @@
       </div>
 
       <header class="masthead">
-        <div class="record-meta" aria-label="Visual record">
+        <div class="record-meta" role="group" aria-label="Visual record">
           <span id="record-index">[001/003]</span>
-          <span id="record-label">FORCE</span>
+          <span id="record-label">FORM</span>
           <span class="density-ramp" aria-hidden="true">.:-=+*#%@</span>
         </div>
-        <button class="motion-control" id="motion-control" type="button" aria-pressed="true">
-          MOTION—ON
-        </button>
+        <div class="view-controls" role="group" aria-label="Artwork controls">
+          <button class="view-control" id="view-control" type="button" aria-pressed="false" aria-label="Show full-color artwork">
+            VIEW—DITHER
+          </button>
+          <button class="motion-control" id="motion-control" type="button" aria-pressed="true">
+            MOTION—ON
+          </button>
+        </div>
       </header>
 
       <h1 class="visually-hidden">ACTUAL</h1>
 
       <section class="identity" aria-label="Artwork record" aria-live="polite">
+        <div class="art-plate" aria-hidden="true">
+          <i class="crop-mark crop-mark-nw"></i>
+          <i class="crop-mark crop-mark-ne"></i>
+          <i class="crop-mark crop-mark-sw"></i>
+          <i class="crop-mark crop-mark-se"></i>
+          <span class="plate-axis plate-axis-x"></span>
+          <span class="plate-axis plate-axis-y"></span>
+          <span class="plate-note">ACT—SIG / 26</span>
+        </div>
         <div class="scene-copy">
-          <span class="scene-step" id="scene-step">001 / FORCE</span>
-          <span class="scene-line" id="scene-line">THE WORLD ARRIVES IN WAVES.</span>
+          <span class="scene-step" id="scene-step">001 / FORM</span>
+          <span class="scene-line" id="scene-line">MATTER TAKES A POSITION.</span>
           <span class="scene-caption">
-            <span id="scene-title">THE GREAT WAVE</span>
-            <span id="scene-artist">KATSUSHIKA HOKUSAI — C. 1830–32</span>
+            <span id="scene-title">THE DEATH OF SOCRATES</span>
+            <span id="scene-artist">JACQUES LOUIS DAVID — 1787</span>
           </span>
         </div>
       </section>
@@ -64,10 +78,8 @@
           <a
             class="source-credit"
             id="source-credit"
-            href="https://www.metmuseum.org/art/collection/search/56353"
-            target="_blank"
-            rel="noreferrer"
-          >3 SOURCES — OPEN ACCESS</a>
+            href="/llms.txt#record-001-form"
+          >3 WORKS — THE MET CC0</a>
         </div>
         <a class="email" href="mailto:hello@actual.ltd">
           <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>
@@ -76,7 +88,7 @@
 
       <noscript>
         <style>
-          .motion-control { display: none; }
+          .motion-control, .view-control { display: none; }
           .company-description { opacity: 1; transform: none; }
         </style>
       </noscript>
