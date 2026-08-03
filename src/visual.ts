@@ -52,8 +52,7 @@ export const VISUAL_STATES: readonly VisualState[] = [
 
 export interface VisualController {
   setMotionEnabled(enabled: boolean): void;
-  nextScene(): void;
-  previousScene(): void;
+  setScene(index: number): void;
   destroy(): void;
 }
 
@@ -264,8 +263,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     options.onUnavailable();
     return {
       setMotionEnabled: () => undefined,
-      nextScene: () => undefined,
-      previousScene: () => undefined,
+      setScene: () => undefined,
       destroy: () => undefined,
     };
   }
@@ -639,11 +637,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   }
 
   const goToScene = (nextIndex: number): void => {
-    if (destroyed || nextIndex === activeStateIndex) return;
+    const normalizedIndex = (nextIndex + VISUAL_STATES.length) % VISUAL_STATES.length;
+    if (destroyed || normalizedIndex === activeStateIndex) return;
     const now = performance.now();
-    if (hasTransition(now)) return;
     previousStateIndex = activeStateIndex;
-    activeStateIndex = (nextIndex + VISUAL_STATES.length) % VISUAL_STATES.length;
+    activeStateIndex = normalizedIndex;
     transitionStartedAt = now;
     options.onStateChange(VISUAL_STATES[activeStateIndex]);
     scheduleFrame();
@@ -723,12 +721,8 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       scheduleFrame();
     },
 
-    nextScene(): void {
-      goToScene(activeStateIndex + 1);
-    },
-
-    previousScene(): void {
-      goToScene(activeStateIndex - 1);
+    setScene(index: number): void {
+      goToScene(index);
     },
 
     destroy(): void {

@@ -1,3 +1,6 @@
+import Lenis from "lenis";
+import LenisSnap from "lenis/snap";
+import "lenis/dist/lenis.css";
 import "./styles.css";
 import type { VisualController, VisualState } from "./visual";
 
@@ -18,41 +21,102 @@ const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
 const sceneTitle = requireElement<HTMLSpanElement>("#scene-title");
 const sceneArtist = requireElement<HTMLSpanElement>("#scene-artist");
 const sourceCredit = requireElement<HTMLAnchorElement>("#source-credit");
+const scrollScenes = [...document.querySelectorAll<HTMLElement>("[data-scroll-scene]")];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const coarsePointerQuery = window.matchMedia("(any-pointer: coarse)");
 
 let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
 let visual: VisualController | null = null;
-let wheelDistance = 0;
-let wheelDirection: -1 | 0 | 1 = 0;
-let wheelGestureActive = false;
-let wheelResetTimer = 0;
-let touchStartX: number | null = null;
-let touchStartY: number | null = null;
-let navigationLockedUntil = 0;
+let lenis: Lenis | null = null;
+let snap: LenisSnap | null = null;
+let scrollFrame = 0;
+let activeSceneIndex = -1;
 
-const WHEEL_TRIGGER_DISTANCE = 32;
-const WHEEL_GESTURE_IDLE_MS = 320;
-const NAVIGATION_LOCK_MS = 1040;
-
-function navigateScene(direction: -1 | 1): boolean {
-  const now = performance.now();
-  if (!visual || now < navigationLockedUntil) return false;
-
-  navigationLockedUntil = now + NAVIGATION_LOCK_MS;
-  if (direction > 0) visual.nextScene();
-  else visual.previousScene();
-  return true;
+function clampSceneIndex(index: number): number {
+  return Math.max(0, Math.min(scrollScenes.length - 1, index));
 }
 
-function resetWheelGesture(): void {
-  wheelDistance = 0;
-  wheelDirection = 0;
-  wheelGestureActive = false;
+function nearestSceneIndex(scrollPosition = window.scrollY): number {
+  return clampSceneIndex(Math.round(scrollPosition / Math.max(window.innerHeight, 1)));
+}
+
+function selectScene(index: number): void {
+  const nextIndex = clampSceneIndex(index);
+  if (nextIndex === activeSceneIndex) return;
+  activeSceneIndex = nextIndex;
+  visual?.setScene(nextIndex);
+}
+
+function syncSceneFromScroll(scrollPosition = window.scrollY): void {
+  selectScene(nearestSceneIndex(scrollPosition));
+}
+
+function onNativeScroll(): void {
+  if (scrollFrame !== 0) return;
+  scrollFrame = window.requestAnimationFrame(() => {
+    scrollFrame = 0;
+    syncSceneFromScroll();
+  });
+}
+
+function destroyScroller(): void {
+  if (scrollFrame !== 0) window.cancelAnimationFrame(scrollFrame);
+  scrollFrame = 0;
+  window.removeEventListener("scroll", onNativeScroll);
+  snap?.destroy();
+  snap = null;
+  lenis?.destroy();
+  lenis = null;
+  document.documentElement.classList.remove("is-lenis-enhanced");
+}
+
+function initialiseScroller(): void {
+  const preservedScroll = window.scrollY;
+  destroyScroller();
+  window.addEventListener("scroll", onNativeScroll, { passive: true });
+
+  const shouldEnhance = !reducedMotionQuery.matches && !coarsePointerQuery.matches;
+  if (shouldEnhance) {
+    document.documentElement.classList.add("is-lenis-enhanced");
+    const easing = (progress: number): number => 1 - Math.pow(1 - progress, 4);
+    lenis = new Lenis({
+      autoRaf: true,
+      smoothWheel: true,
+      syncTouch: false,
+      duration: 0.82,
+      easing,
+      anchors: true,
+      overscroll: false,
+      stopInertiaOnNavigate: true,
+    });
+    snap = new LenisSnap(lenis, {
+      type: "lock",
+      distanceThreshold: "100%",
+      debounce: 0,
+      duration: 0.78,
+      easing,
+    });
+    snap.addElements(scrollScenes, { align: "start" });
+  }
+
+  if (Math.abs(window.scrollY - preservedScroll) > 1) window.scrollTo(0, preservedScroll);
+  syncSceneFromScroll(preservedScroll);
+}
+
+function scrollToScene(index: number): void {
+  const nextIndex = clampSceneIndex(index);
+  if (snap) {
+    snap.goTo(nextIndex);
+  } else {
+    scrollScenes[nextIndex]?.scrollIntoView({
+      block: "start",
+      behavior: reducedMotionQuery.matches ? "auto" : "smooth",
+    });
+  }
 }
 
 function updateRecord(state: VisualState): void {
-  const nextNumber = state.index % 3 + 1;
   indexElement.textContent = `[${state.code}/003]`;
   labelElement.textContent = state.label;
   sceneStep.textContent = `${state.code} / ${state.label}`;
@@ -61,7 +125,9 @@ function updateRecord(state: VisualState): void {
   sceneArtist.textContent = `${state.artist} — ${state.date}`;
   sourceCredit.textContent = state.sourceLabel;
   sourceCredit.href = state.sourceUrl;
-  scrollIndex.textContent = String(nextNumber).padStart(3, "0");
+  scrollIndex.textContent = state.index < scrollScenes.length
+    ? String(state.index + 1).padStart(3, "0")
+    : "END";
 
   if (!reducedMotionQuery.matches) {
     const keyframes = [
@@ -97,6 +163,7 @@ async function initialiseVisual(): Promise<void> {
         updateMotionControl();
       },
     });
+    visual.setScene(Math.max(activeSceneIndex, 0));
   } catch {
     visualLayer.classList.add("is-unavailable");
     motionControl.disabled = true;
@@ -112,70 +179,28 @@ motionControl.addEventListener("click", () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (event.repeat) return;
   const target = event.target;
-  const isControl = target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
+  const isControl = target instanceof Element
+    && target.closest("a, button, input, textarea, select, [contenteditable='true']") !== null;
+  if (isControl) return;
 
-  if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
-    event.preventDefault();
-    if (!event.repeat) navigateScene(1);
-  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp") {
-    event.preventDefault();
-    if (!event.repeat) navigateScene(-1);
-  } else if (event.key === " " && !isControl) {
-    event.preventDefault();
-    if (!event.repeat) navigateScene(event.shiftKey ? -1 : 1);
+  const currentIndex = nearestSceneIndex(lenis?.scroll ?? window.scrollY);
+  let nextIndex: number | null = null;
+
+  if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown" || (event.key === " " && !event.shiftKey)) {
+    nextIndex = currentIndex + 1;
+  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp" || (event.key === " " && event.shiftKey)) {
+    nextIndex = currentIndex - 1;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = scrollScenes.length - 1;
   }
-});
 
-window.addEventListener("wheel", (event) => {
-  if (Math.abs(event.deltaY) < Math.abs(event.deltaX) * 0.75 || event.deltaY === 0) return;
+  if (nextIndex === null) return;
   event.preventDefault();
-
-  const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-    ? 16
-    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-      ? window.innerHeight
-      : 1;
-  const distance = event.deltaY * unit;
-  const direction = Math.sign(distance) as -1 | 1;
-
-  window.clearTimeout(wheelResetTimer);
-  wheelResetTimer = window.setTimeout(resetWheelGesture, WHEEL_GESTURE_IDLE_MS);
-
-  if (!wheelGestureActive) {
-    if (wheelDirection !== 0 && direction !== wheelDirection) wheelDistance = 0;
-    wheelDirection = direction;
-    wheelDistance += distance;
-
-    if (Math.abs(wheelDistance) >= WHEEL_TRIGGER_DISTANCE) {
-      if (visual) {
-        wheelGestureActive = true;
-        navigateScene(direction);
-      }
-    }
-  }
-}, { passive: false });
-
-window.addEventListener("pointerdown", (event) => {
-  if (event.pointerType !== "touch") return;
-  touchStartX = event.clientX;
-  touchStartY = event.clientY;
-});
-
-window.addEventListener("pointerup", (event) => {
-  if (event.pointerType !== "touch" || touchStartX === null || touchStartY === null) return;
-  const distanceX = event.clientX - touchStartX;
-  const distanceY = event.clientY - touchStartY;
-  touchStartX = null;
-  touchStartY = null;
-
-  if (Math.abs(distanceY) < 52 || Math.abs(distanceY) <= Math.abs(distanceX) * 1.1) return;
-  navigateScene(distanceY < 0 ? 1 : -1);
-});
-
-window.addEventListener("pointercancel", () => {
-  touchStartX = null;
-  touchStartY = null;
+  scrollToScene(nextIndex);
 });
 
 wordmark.addEventListener("click", () => {
@@ -189,13 +214,28 @@ reducedMotionQuery.addEventListener("change", (event) => {
     motionEnabled = !event.matches;
     updateMotionControl();
   }
+  initialiseScroller();
+});
+
+coarsePointerQuery.addEventListener("change", initialiseScroller);
+
+document.addEventListener("visibilitychange", () => {
+  if (!lenis) return;
+  if (document.hidden) lenis.stop();
+  else lenis.start();
+});
+
+window.addEventListener("pageshow", () => {
+  requestAnimationFrame(() => syncSceneFromScroll());
 });
 
 window.addEventListener("pagehide", (event) => {
-  window.clearTimeout(wheelResetTimer);
-  resetWheelGesture();
-  if (!event.persisted) visual?.destroy();
+  if (!event.persisted) {
+    destroyScroller();
+    visual?.destroy();
+  }
 }, { once: true });
 
 updateMotionControl();
+initialiseScroller();
 requestAnimationFrame(() => void initialiseVisual());

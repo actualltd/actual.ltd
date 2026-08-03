@@ -21,40 +21,48 @@ browser wait 350 >/dev/null
 result="$(browser eval --stdin <<'EVALEOF'
 (async () => {
   const record = () => document.querySelector("#record-index")?.textContent ?? "MISSING";
-  const wheel = (deltaY) => window.dispatchEvent(new WheelEvent("wheel", {
-    deltaY,
-    bubbles: true,
-    cancelable: true,
-  }));
   const pause = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
 
-  const before = record();
-  wheel(120);
-  await pause(230);
-  const afterFirst = record();
-  wheel(70);
-  await pause(120);
-  const afterTail = record();
+  window.scrollTo(0, 0);
+  await pause(200);
+  const viewport = window.innerHeight;
+  const scrollHeight = document.documentElement.scrollHeight;
+  const sceneCount = document.querySelectorAll("[data-scroll-scene]").length;
+  const first = { record: record(), y: window.scrollY };
 
-  await pause(1100);
-  wheel(120);
-  await pause(120);
-  const afterNewGesture = record();
+  window.scrollTo(0, viewport);
+  await pause(500);
+  const second = { record: record(), y: window.scrollY };
 
-  return { before, afterFirst, afterTail, afterNewGesture };
+  window.scrollTo(0, viewport * 2);
+  await pause(500);
+  const third = { record: record(), y: window.scrollY };
+
+  window.scrollTo(0, 0);
+  await pause(500);
+  const returned = { record: record(), y: window.scrollY };
+
+  return { viewport, scrollHeight, sceneCount, first, second, third, returned };
 })()
 EVALEOF
 )"
 
 if ACTUAL_SCROLL_RESULT="$result" node -e '
   const result = JSON.parse(process.env.ACTUAL_SCROLL_RESULT);
-  const passed = result.before === "[001/003]"
-    && result.afterFirst === "[002/003]"
-    && result.afterTail === "[002/003]"
-    && result.afterNewGesture === "[003/003]";
+  const near = (value, target) => Math.abs(value - target) <= result.viewport * 0.15;
+  const passed = result.sceneCount === 3
+    && result.scrollHeight >= result.viewport * 2.9
+    && result.first.record === "[001/003]"
+    && near(result.first.y, 0)
+    && result.second.record === "[002/003]"
+    && near(result.second.y, result.viewport)
+    && result.third.record === "[003/003]"
+    && near(result.third.y, result.viewport * 2)
+    && result.returned.record === "[001/003]"
+    && near(result.returned.y, 0);
   process.exit(passed ? 0 : 1);
 '; then
-  echo "PASS: one gesture advances one scene; a fresh gesture advances the next"
+  echo "PASS: native scroll positions map cleanly to all three artwork records"
   exit 0
 fi
 
