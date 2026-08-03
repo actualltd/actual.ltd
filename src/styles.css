@@ -2,10 +2,10 @@
 @import "@fontsource-variable/geist-mono";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: "Geist Variable", "Helvetica Neue", Arial, sans-serif;
-  color: #e7e0d4;
-  background: #11100e;
+  color: #11100e;
+  background: #e7e0d4;
   font-synthesis: none;
   text-rendering: geometricPrecision;
   --ink: #11100e;
@@ -24,7 +24,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--ink);
+  background: var(--bone);
 }
 
 body {
@@ -47,7 +47,7 @@ button {
   height: 100svh;
   min-height: 28rem;
   overflow: hidden;
-  background: var(--ink);
+  background: var(--bone);
 }
 
 .visual-layer,
@@ -62,7 +62,7 @@ button {
 .visual-layer {
   z-index: -2;
   overflow: hidden;
-  background: var(--ink);
+  background: var(--bone);
 }
 
 .visual-fallback {
@@ -70,11 +70,8 @@ button {
   opacity: 1;
   background:
     url("/poster.png") center / cover no-repeat,
-    radial-gradient(ellipse at 72% 30%, transparent 0 8%, rgb(231 224 212 / 0.7) 9% 18%, transparent 19% 26%),
-    radial-gradient(ellipse at 31% 68%, rgb(231 224 212 / 0.86) 0 10%, transparent 11% 20%, rgb(231 224 212 / 0.36) 21% 28%, transparent 29%),
-    repeating-radial-gradient(circle at 62% 54%, transparent 0 0.42rem, rgb(231 224 212 / 0.11) 0.48rem 0.58rem),
-    var(--ink);
-  filter: contrast(1.45);
+    radial-gradient(circle at 50% 50%, rgb(17 16 14 / 0.95) 0 17%, transparent 17.2%),
+    var(--bone);
   transition: opacity 500ms ease;
 }
 
@@ -101,12 +98,11 @@ button {
   justify-content: space-between;
   align-items: flex-start;
   font-family: "Geist Mono Variable", ui-monospace, monospace;
-  font-size: clamp(0.7rem, 0.72vw, 0.78rem);
+  font-size: clamp(0.72rem, 0.76vw, 0.82rem);
   font-weight: 510;
   line-height: 1;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  mix-blend-mode: difference;
 }
 
 .masthead {
@@ -123,6 +119,11 @@ button {
   grid-template-columns: auto auto;
   gap: 0.55rem 1rem;
   align-items: baseline;
+  padding: 0.72rem 0.78rem;
+  border: 1px solid var(--bone);
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+  color: var(--bone);
 }
 
 .density-ramp {
@@ -132,7 +133,7 @@ button {
 }
 
 .motion-control,
-.wordmark {
+.story-trigger {
   appearance: none;
   padding: 0;
   border: 0;
@@ -144,11 +145,20 @@ button {
 
 .motion-control {
   position: relative;
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--bone);
+  background: var(--ink);
+  align-items: center;
   font-family: "Geist Mono Variable", ui-monospace, monospace;
   font-size: inherit;
   line-height: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  box-shadow: 0 0 0 2px var(--ink);
+  color: var(--bone);
+  transition: color 220ms ease, background-color 220ms ease;
 }
 
 .motion-control:disabled {
@@ -156,26 +166,12 @@ button {
   opacity: 0.58;
 }
 
-.motion-control::after,
-.email::after {
-  position: absolute;
-  right: 0;
-  bottom: -0.4rem;
-  left: 0;
-  height: 1px;
-  content: "";
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 260ms var(--ease-out);
-}
-
-.motion-control:hover::after,
-.motion-control:focus-visible::after,
-.email:hover::after,
-.email:focus-visible::after {
-  transform: scaleX(1);
-  transform-origin: left;
+.motion-control:hover,
+.motion-control:focus-visible,
+.email:hover,
+.email:focus-visible {
+  color: var(--ink);
+  background: var(--bone);
 }
 
 .identity {
@@ -183,34 +179,60 @@ button {
   z-index: 1;
   top: 50%;
   left: 50%;
-  width: min(94vw, 105rem);
+  width: min(88vw, 42rem);
   transform: translate(-50%, -50%);
   text-align: center;
 }
 
-.wordmark {
-  display: block;
-  width: 100%;
-  color: var(--bone);
+.story-trigger {
+  display: inline-grid;
+  min-width: min(78vw, 27rem);
+  padding: clamp(1rem, 2vw, 1.4rem) clamp(1.25rem, 3vw, 2.1rem);
+  border: 1px solid var(--ink);
+  background: var(--bone);
+  box-shadow: 0 0 0 4px var(--bone);
+  color: var(--ink);
+  cursor: pointer;
+  gap: 0.55rem;
+  justify-items: center;
+  transition: transform 600ms var(--ease-out), box-shadow 300ms ease;
+}
+
+.story-trigger:is(:hover, :focus-visible),
+.story-trigger.is-revealed {
+  transform: translateY(-0.2rem);
+  box-shadow: 0 0 0 4px var(--bone), 0 0.7rem 0 var(--ink);
+}
+
+.story-step,
+.story-detail {
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  font-size: clamp(0.66rem, 0.72vw, 0.76rem);
+  font-weight: 520;
+  line-height: 1.2;
+  letter-spacing: 0.11em;
+}
+
+.story-step {
+  opacity: 0.68;
+}
+
+.story-line {
   font-family: "Geist Variable", "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(4.7rem, 18.1vw, 19rem);
-  font-weight: 680;
-  font-variation-settings: "wght" 680;
-  line-height: 0.72;
-  letter-spacing: -0.089em;
-  text-indent: -0.089em;
-  text-wrap: nowrap;
-  -webkit-text-stroke: 1px rgb(17 16 14 / 0.18);
-  text-shadow: 0 2px 18px rgb(17 16 14 / 0.2);
-  transition: letter-spacing 1000ms var(--ease-out), filter 400ms ease;
+  font-size: clamp(2.15rem, 4.4vw, 4.2rem);
+  font-weight: 590;
+  font-variation-settings: "wght" 590;
+  line-height: 0.96;
+  letter-spacing: -0.045em;
+  text-align: center;
+  text-wrap: balance;
 }
 
-.wordmark:is(:hover, :focus-visible),
-.wordmark.is-revealed {
-  letter-spacing: -0.078em;
+.story-detail {
+  white-space: nowrap;
 }
 
-.wordmark:focus-visible,
+.story-trigger:focus-visible,
 .motion-control:focus-visible,
 .email:focus-visible {
   outline: 1px solid currentColor;
@@ -238,23 +260,37 @@ button {
   transition: opacity 420ms ease, transform 850ms var(--ease-out);
 }
 
-.wordmark:is(:hover, :focus-visible, .is-revealed) + .company-description {
+.story-trigger:is(:hover, :focus-visible, .is-revealed) + .company-description {
   opacity: 1;
   transform: translate(-50%, 0);
 }
 
 .edition {
-  opacity: 0.58;
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--bone);
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+  align-items: center;
+  color: var(--bone);
 }
 
 .email {
   position: relative;
   display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--bone);
+  background: var(--ink);
   gap: 0.5rem;
-  align-items: baseline;
+  align-items: center;
   color: inherit;
   text-decoration: none;
   text-transform: none;
+  box-shadow: 0 0 0 2px var(--ink);
+  transition: color 220ms ease, background-color 220ms ease;
+  color: var(--bone);
 }
 
 .email-arrow {
@@ -286,17 +322,24 @@ button {
   }
 
   .identity {
-    width: calc(100vw - 1.5rem);
-  }
-
-  .wordmark {
-    font-size: 22.2vw;
-    line-height: 0.78;
+    width: calc(100vw - 2.5rem);
   }
 
   .company-description {
     top: calc(100% + 1.75rem);
   }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -315,7 +358,7 @@ button {
     display: none;
   }
 
-  .wordmark,
+  .story-trigger,
   .company-description {
     color: CanvasText;
   }

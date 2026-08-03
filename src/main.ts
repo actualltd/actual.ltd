@@ -16,7 +16,16 @@ const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
 const wordmark = requireElement<HTMLButtonElement>("#actual-wordmark");
+const storyStep = requireElement<HTMLSpanElement>("#story-step");
+const storyLine = requireElement<HTMLSpanElement>("#story-line");
+const storyDetail = requireElement<HTMLSpanElement>("#story-detail");
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+const STORY_COPY = [
+  { line: "POSSIBILITY", detail: "UNSEEN, BUT PRESENT." },
+  { line: "TAKING FORM", detail: "A SIGNAL BECOMES STRUCTURE." },
+  { line: "MADE ACTUAL", detail: "FORM, MADE PRESENT." },
+] as const;
 
 let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
@@ -55,6 +64,20 @@ async function initialiseVisual(): Promise<void> {
 function updateRecord(state: VisualState): void {
   indexElement.textContent = `[${String(state.index).padStart(3, "0")}/003]`;
   labelElement.textContent = state.label;
+  storyStep.textContent = `${String(state.index).padStart(2, "0")} — 03`;
+
+  const story = STORY_COPY[state.index - 1] ?? STORY_COPY[0];
+  storyLine.textContent = story.line;
+  storyDetail.textContent = story.detail;
+
+  if (!reducedMotionQuery.matches) {
+    const keyframes = [
+      { opacity: 0.2, transform: "translateY(0.22em)" },
+      { opacity: 1, transform: "translateY(0)" },
+    ];
+    storyLine.animate(keyframes, { duration: 620, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+    storyDetail.animate(keyframes, { duration: 760, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+  }
 }
 
 function updateMotionControl(): void {
@@ -84,20 +107,20 @@ motionControl.addEventListener("click", () => {
 });
 
 wordmark.addEventListener("pointerenter", (event) => {
-  pointerInside = true;
+  pointerInside = event.pointerType !== "touch";
   updatePointer(event);
   updateReveal();
 });
 
 wordmark.addEventListener("pointermove", updatePointer);
 
-wordmark.addEventListener("pointerleave", () => {
-  pointerInside = false;
+wordmark.addEventListener("pointerleave", (event) => {
+  if (event.pointerType !== "touch") pointerInside = false;
   updateReveal();
 });
 
 wordmark.addEventListener("focus", () => {
-  focusInside = true;
+  focusInside = wordmark.matches(":focus-visible");
   visual?.setPointer(0.5, 0.5);
   updateReveal();
 });
@@ -119,7 +142,13 @@ reducedMotionQuery.addEventListener("change", (event) => {
   }
 });
 
-window.addEventListener("pagehide", () => visual?.destroy(), { once: true });
+window.addEventListener(
+  "pagehide",
+  (event) => {
+    if (!event.persisted) visual?.destroy();
+  },
+  { once: true },
+);
 
 updateMotionControl();
 updateReveal();

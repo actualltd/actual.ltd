@@ -196,6 +196,22 @@ const FRAGMENT_SHADER = /* glsl */ `
     return (float(BAYER_8[matrixIndex]) + 0.5) / 64.0;
   }
 
+  float objectDistance(float state, vec2 p, float time) {
+    if (state < 0.5) {
+      vec2 q = p * vec2(0.88, 1.08);
+      float edge = sin(q.x * 10.0 + time * 0.018) * sin(q.y * 8.0 - time * 0.012);
+      edge += 0.5 * sin((q.x + q.y) * 17.0 - time * 0.009);
+      return length(q) + edge * 0.016;
+    }
+    if (state < 1.5) {
+      vec2 q = abs(p * vec2(0.98, 1.04));
+      float squircle = pow(pow(q.x, 4.0) + pow(q.y, 4.0), 0.25);
+      return squircle + 0.012 * sin((p.x - p.y) * 18.0 + time * 0.025);
+    }
+    float angle = atan(p.y, p.x);
+    return length(p) + 0.012 * sin(angle * 8.0 + time * 0.018);
+  }
+
   void main() {
     float aspect = uResolution.x / max(uResolution.y, 1.0);
     vec2 p = vUv - 0.5;
@@ -209,13 +225,23 @@ const FRAGMENT_SHADER = /* glsl */ `
     }
     tone = clamp(tone, 0.0, 1.0);
 
+    float currentDistance = objectDistance(uCurrentState, p, uTime);
+    float objectRadius = min(0.285, aspect * 0.36);
+    float shapeDistance = currentDistance;
+    if (stateMix > 0.001) {
+      float nextDistance = objectDistance(uNextState, p, uTime);
+      shapeDistance = mix(currentDistance, nextDistance, stateMix);
+    }
+    float objectMask = 1.0 - smoothstep(objectRadius - 0.006, objectRadius + 0.006, shapeDistance);
+
     float dithered = step(bayerThreshold(), tone);
+    dithered = mix(1.0, dithered, objectMask);
     vec2 pointer = uPointer - 0.5;
     pointer.x *= aspect;
     float pointerDistance = length(p - pointer);
     float aperture = (1.0 - smoothstep(0.055, 0.31, pointerDistance)) * uReveal;
     float quietTone = smoothstep(0.22, 0.78, tone);
-    float pixel = mix(dithered, quietTone, aperture * 0.88);
+    float pixel = mix(dithered, quietTone, aperture * objectMask * 0.88);
 
     outColor = vec4(mix(uInk, uPaper, pixel), 1.0);
     #include <tonemapping_fragment>
@@ -279,7 +305,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   }
 
   renderer.outputColorSpace = SRGBColorSpace;
-  renderer.setClearColor(0x11100e, 1);
+  renderer.setClearColor(0xe7e0d4, 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * 0.58);
 
   const uniforms = {

@@ -12,7 +12,7 @@
     <meta property="og:image" content="https://actual.ltd/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="ACTUAL over a warm black-and-bone dithered field." />
+    <meta property="og:image:alt" content="Possibility, taking form as a black-and-bone dithered object." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -35,15 +35,19 @@
         </button>
       </header>
 
-      <section class="identity" aria-labelledby="actual-wordmark">
+      <h1 class="visually-hidden">ACTUAL</h1>
+
+      <section class="identity" aria-label="From possibility to something actual">
         <button
-          class="wordmark"
+          class="story-trigger"
           id="actual-wordmark"
           type="button"
           aria-expanded="false"
           aria-controls="company-description"
         >
-          ACTUAL
+          <span class="story-step" id="story-step" aria-hidden="true">01 — 03</span>
+          <span class="story-line" id="story-line">POSSIBILITY</span>
+          <span class="story-detail" id="story-detail">UNSEEN, BUT PRESENT.</span>
         </button>
         <p class="company-description" id="company-description">
           <span aria-hidden="true">[</span> INDEPENDENT COMPANY <span aria-hidden="true">]</span>
@@ -51,7 +55,7 @@
       </section>
 
       <footer class="footer">
-        <span class="edition" aria-hidden="true">INDEX 001</span>
+        <span class="edition">ACTUAL</span>
         <a class="email" href="mailto:hello@actual.ltd">
           <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>
         </a>
@@ -60,7 +64,7 @@
       <noscript>
         <style>
           .motion-control { display: none; }
-          .company-description { opacity: 1; transform: none; }
+          .company-description { opacity: 1; transform: translate(-50%, 0); }
         </style>
       </noscript>
     </main>
