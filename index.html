@@ -12,7 +12,7 @@
     <meta property="og:image" content="https://actual.ltd/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="A layered black-and-bone dithered study of Hokusai's Great Wave." />
+    <meta property="og:image:alt" content="A mixed-dither collage of Hokusai's wave, a Sharaku actor, and a conch shell." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -48,10 +48,12 @@
         </div>
       </section>
 
-      <button class="scene-next" id="next-scene" type="button" aria-label="Next artwork, record 002">
-        <span class="next-glyph" aria-hidden="true">→</span>
-        <span class="next-index" id="next-index" aria-hidden="true">002</span>
-      </button>
+      <div class="scroll-cue" aria-hidden="true">
+        <span class="scroll-label scroll-label-desktop">SCROLL</span>
+        <span class="scroll-label scroll-label-touch">SWIPE</span>
+        <span class="scroll-rule"></span>
+        <span class="scroll-index" id="scroll-index">002</span>
+      </div>
 
       <footer class="footer">
         <div class="edition">
@@ -65,7 +67,7 @@
             href="https://www.metmuseum.org/art/collection/search/56353"
             target="_blank"
             rel="noreferrer"
-          >THE MET — PUBLIC DOMAIN</a>
+          >3 SOURCES — OPEN ACCESS</a>
         </div>
         <a class="email" href="mailto:hello@actual.ltd">
           <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>

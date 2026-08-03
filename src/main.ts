@@ -11,8 +11,7 @@ const visualLayer = requireElement<HTMLDivElement>("#visual-layer");
 const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
-const nextButton = requireElement<HTMLButtonElement>("#next-scene");
-const nextIndex = requireElement<HTMLSpanElement>("#next-index");
+const scrollIndex = requireElement<HTMLSpanElement>("#scroll-index");
 const wordmark = requireElement<HTMLButtonElement>("#actual-wordmark");
 const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
 const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
@@ -24,6 +23,11 @@ const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
 let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
 let visual: VisualController | null = null;
+let wheelDistance = 0;
+let wheelGestureActive = false;
+let wheelResetTimer = 0;
+let touchStartX: number | null = null;
+let touchStartY: number | null = null;
 
 function updateRecord(state: VisualState): void {
   const nextNumber = state.index % 3 + 1;
@@ -35,8 +39,7 @@ function updateRecord(state: VisualState): void {
   sceneArtist.textContent = `${state.artist} — ${state.date}`;
   sourceCredit.textContent = state.sourceLabel;
   sourceCredit.href = state.sourceUrl;
-  nextIndex.textContent = String(nextNumber).padStart(3, "0");
-  nextButton.setAttribute("aria-label", `Next artwork, record ${String(nextNumber).padStart(3, "0")}`);
+  scrollIndex.textContent = String(nextNumber).padStart(3, "0");
 
   if (!reducedMotionQuery.matches) {
     const keyframes = [
@@ -86,18 +89,77 @@ motionControl.addEventListener("click", () => {
   updateMotionControl();
 });
 
-nextButton.addEventListener("click", () => visual?.nextScene());
-
 window.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowRight") visual?.nextScene();
-  else if (event.key === "ArrowLeft") visual?.previousScene();
+  const target = event.target;
+  const isControl = target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
+
+  if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
+    event.preventDefault();
+    visual?.nextScene();
+  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp") {
+    event.preventDefault();
+    visual?.previousScene();
+  } else if (event.key === " " && !isControl) {
+    event.preventDefault();
+    if (event.shiftKey) visual?.previousScene();
+    else visual?.nextScene();
+  }
 });
+
+window.addEventListener("wheel", (event) => {
+  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  event.preventDefault();
+
+  const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+    ? 16
+    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+      ? window.innerHeight
+      : 1;
+
+  if (!wheelGestureActive) {
+    wheelDistance += event.deltaY * unit;
+    if (Math.abs(wheelDistance) >= 44) {
+      if (wheelDistance > 0) visual?.nextScene();
+      else visual?.previousScene();
+      wheelGestureActive = true;
+    }
+  }
+
+  window.clearTimeout(wheelResetTimer);
+  wheelResetTimer = window.setTimeout(() => {
+    wheelDistance = 0;
+    wheelGestureActive = false;
+  }, 180);
+}, { passive: false });
 
 window.addEventListener("pointermove", (event) => {
   visual?.setPointer(event.clientX / window.innerWidth, event.clientY / window.innerHeight);
 }, { passive: true });
 
 document.documentElement.addEventListener("pointerleave", () => visual?.setPointer(0.5, 0.5));
+
+window.addEventListener("pointerdown", (event) => {
+  if (event.pointerType !== "touch") return;
+  touchStartX = event.clientX;
+  touchStartY = event.clientY;
+});
+
+window.addEventListener("pointerup", (event) => {
+  if (event.pointerType !== "touch" || touchStartX === null || touchStartY === null) return;
+  const distanceX = event.clientX - touchStartX;
+  const distanceY = event.clientY - touchStartY;
+  touchStartX = null;
+  touchStartY = null;
+
+  if (Math.abs(distanceY) < 52 || Math.abs(distanceY) <= Math.abs(distanceX) * 1.1) return;
+  if (distanceY < 0) visual?.nextScene();
+  else visual?.previousScene();
+});
+
+window.addEventListener("pointercancel", () => {
+  touchStartX = null;
+  touchStartY = null;
+});
 
 wordmark.addEventListener("click", () => {
   const expanded = wordmark.getAttribute("aria-expanded") === "true";
@@ -113,6 +175,7 @@ reducedMotionQuery.addEventListener("change", (event) => {
 });
 
 window.addEventListener("pagehide", (event) => {
+  window.clearTimeout(wheelResetTimer);
   if (!event.persisted) visual?.destroy();
 }, { once: true });
 
