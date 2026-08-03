@@ -50,6 +50,13 @@ export interface VisualState {
   credits: readonly ArtworkCredit[];
 }
 
+export interface ArtworkSelection {
+  state: VisualState;
+  credit: ArtworkCredit;
+  imageUrl: string;
+  imageElement?: HTMLImageElement;
+}
+
 export const VISUAL_STATES: readonly VisualState[] = [
   {
     index: 1,
@@ -113,6 +120,7 @@ interface VisualOptions {
   onUnavailable: () => void;
   onAvailable?: () => void;
   onInteractionStateChange?: (active: boolean) => void;
+  onArtworkOpen?: (selection: ArtworkSelection) => void;
 }
 
 type LayerRole = ArtworkCredit["role"];
@@ -281,14 +289,6 @@ function clampIndex(index: number): number {
   return Math.max(0, Math.min(SCENES.length - 1, index));
 }
 
-function idle(callback: () => void): void {
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(callback, { timeout: 1200 });
-  } else {
-    globalThis.setTimeout(callback, 80);
-  }
-}
-
 export function createVisual(container: HTMLElement, options: VisualOptions): VisualController {
   const stage = document.createElement("div");
   stage.className = "art-engine";
@@ -342,10 +342,10 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   let dragParallaxOffsetY = 0;
   let lastPointerX = 0;
   let lastPointerY = 0;
-  let lastTapTime = 0;
-  let lastTapRole: LayerRole | null = null;
+  let dragMoved = false;
   let gestureLayer: LayerRecord | null = null;
   let gestureStartScale = 1;
+  let lastGestureEndTime = -Infinity;
   let resizingArtwork = false;
   let resizeEndTimer = 0;
   let interactionActive = false;
@@ -467,6 +467,10 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const cached = textures.get(url);
     if (cached) return cached;
     const texture = await new TextureLoader().loadAsync(url);
+    const image = texture.image;
+    if (image instanceof HTMLImageElement) {
+      await image.decode().catch(() => undefined);
+    }
     texture.colorSpace = SRGBColorSpace;
     texture.minFilter = LinearFilter;
     texture.magFilter = LinearFilter;
@@ -527,6 +531,17 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     })();
     recordLoads[index] = load;
     return load;
+  };
+
+  const prefetchFollowingRecords = (): void => {
+    const sources = SCENES.slice(1).flatMap((config) => config.layers.map((layer) => layer.source));
+    sources.forEach((source) => {
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.as = "image";
+      link.href = source;
+      document.head.append(link);
+    });
   };
 
   const activateScene = async (index: number, immediate = false): Promise<void> => {
@@ -881,9 +896,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       setVisibleRecord(0);
       showRenderer();
       requestRender();
-      idle(() => {
-        void Promise.all([loadRecord(1), loadRecord(2)]).then(() => requestRender()).catch(() => undefined);
-      });
+      prefetchFollowingRecords();
     } catch {
       showFallback();
     }
@@ -922,6 +935,20 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       if (clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom) return layer;
     }
     return null;
+  };
+
+  const openArtwork = (layer: LayerRecord): void => {
+    const state = VISUAL_STATES[activeSceneIndex];
+    const credit = state?.credits.find((entry) => entry.role === layer.role);
+    const layerConfig = SCENES[activeSceneIndex]?.layers.find((entry) => entry.role === layer.role);
+    if (!state || !credit || !layerConfig) return;
+    const image = layer.material.map?.image;
+    options.onArtworkOpen?.({
+      state,
+      credit,
+      imageUrl: layerConfig.source,
+      imageElement: image instanceof HTMLImageElement ? image : undefined,
+    });
   };
 
   const moveLayer = (layer: LayerRecord, deltaX: number, deltaY: number): void => {
@@ -1014,6 +1041,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     draggingLayer = layer;
     draggingPointerId = event.pointerId;
     dragPending = event.pointerType === "touch";
+    dragMoved = false;
     dragStartX = event.clientX;
     dragStartY = event.clientY;
     dragOriginOffsetX = layer.userOffsetX;
@@ -1034,9 +1062,10 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     parallaxTargetY.set((event.clientY / height - 0.5) * 2);
 
     if (draggingLayer && event.pointerId === draggingPointerId) {
+      const totalX = event.clientX - dragStartX;
+      const totalY = event.clientY - dragStartY;
+      if (Math.hypot(totalX, totalY) >= 4) dragMoved = true;
       if (dragPending) {
-        const totalX = event.clientX - dragStartX;
-        const totalY = event.clientY - dragStartY;
         if (Math.hypot(totalX, totalY) >= 7) {
           if (Math.abs(totalX) > Math.abs(totalY) * 1.12) {
             dragPending = false;
@@ -1068,25 +1097,26 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   const onPointerUp = (event: PointerEvent): void => {
     if (event.pointerId !== draggingPointerId) return;
     const releasedLayer = draggingLayer;
-    const wasTap = dragPending;
+    const wasTap = Boolean(releasedLayer) && !dragMoved;
     if (releasedLayer && !wasTap) {
       const currentParallax = getLayerParallax(releasedLayer);
       releasedLayer.userOffsetX += dragParallaxOffsetX - currentParallax.x;
       releasedLayer.userOffsetY += dragParallaxOffsetY - currentParallax.y;
       constrainLayerToPage(releasedLayer);
       syncManipulationDataset(releasedLayer);
+    } else if (releasedLayer && wasTap) {
+      releasedLayer.userOffsetX = dragOriginOffsetX;
+      releasedLayer.userOffsetY = dragOriginOffsetY;
+      constrainLayerToPage(releasedLayer);
+      requestRender();
     }
     draggingLayer = null;
     draggingPointerId = -1;
     dragPending = false;
+    dragMoved = false;
     delete document.documentElement.dataset.artDragging;
     syncInteractionState();
-    if (event.pointerType === "touch" && wasTap && releasedLayer) {
-      const now = performance.now();
-      if (lastTapRole === releasedLayer.role && now - lastTapTime < 340) resetLayer(releasedLayer);
-      lastTapTime = now;
-      lastTapRole = releasedLayer.role;
-    }
+    if (wasTap && releasedLayer && performance.now() - lastGestureEndTime > 260) openArtwork(releasedLayer);
     if (event.pointerType !== "touch") setHoveredLayer(hitTestLayer(event.clientX, event.clientY));
   };
 
@@ -1146,6 +1176,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     event.preventDefault();
     event.stopImmediatePropagation();
     gestureLayer = null;
+    lastGestureEndTime = performance.now();
     setResizingArtwork(false);
   };
 

@@ -2,7 +2,7 @@ import Lenis from "lenis";
 import LenisSnap from "lenis/snap";
 import "lenis/dist/lenis.css";
 import "./styles.css";
-import type { VisualController, VisualState } from "./visual";
+import type { ArtworkSelection, VisualController, VisualState } from "./visual";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -28,6 +28,17 @@ const creditsDialog = requireElement<HTMLDialogElement>("#credits-dialog");
 const creditsClose = requireElement<HTMLButtonElement>("#credits-close");
 const creditsChapter = requireElement<HTMLSpanElement>("#credits-chapter");
 const creditsList = requireElement<HTMLOListElement>("#credits-list");
+const artworkDialog = requireElement<HTMLDialogElement>("#artwork-dialog");
+const artworkDetailMedia = requireElement<HTMLDivElement>(".artwork-dialog__media");
+const artworkClose = requireElement<HTMLButtonElement>("#artwork-close");
+const artworkImageFallback = requireElement<HTMLImageElement>("#artwork-detail-image");
+let artworkDetailImage = artworkImageFallback;
+const artworkDetailIndex = requireElement<HTMLSpanElement>("#artwork-detail-index");
+const artworkDetailTitle = requireElement<HTMLHeadingElement>("#artwork-detail-title");
+const artworkDetailArtist = requireElement<HTMLElement>("#artwork-detail-artist");
+const artworkDetailDate = requireElement<HTMLElement>("#artwork-detail-date");
+const artworkDetailRole = requireElement<HTMLElement>("#artwork-detail-role");
+const artworkDetailSource = requireElement<HTMLAnchorElement>("#artwork-detail-source");
 const scrollScenes = [...document.querySelectorAll<HTMLElement>("[data-scroll-scene]")];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const coarsePointerQuery = window.matchMedia("(any-pointer: coarse)");
@@ -117,7 +128,7 @@ function initialiseScroller(): void {
 
 function syncScrollerState(): void {
   if (!lenis) return;
-  if (document.hidden || artworkInteracting || companyDialog.open || creditsDialog.open) lenis.stop();
+  if (document.hidden || artworkInteracting || companyDialog.open || creditsDialog.open || artworkDialog.open) lenis.stop();
   else lenis.start();
 }
 
@@ -191,6 +202,31 @@ function renderCredits(state: VisualState): void {
   }));
 }
 
+function openArtworkDetail(selection: ArtworkSelection): void {
+  const roleIndex = selection.state.credits.findIndex((credit) => credit.role === selection.credit.role) + 1;
+  artworkDetailIndex.textContent = `${selection.state.code}.${String(roleIndex).padStart(2, "0")} / ${selection.credit.role}`;
+  artworkDetailTitle.textContent = selection.credit.title;
+  artworkDetailArtist.textContent = selection.credit.artist;
+  artworkDetailDate.textContent = selection.credit.date;
+  artworkDetailRole.textContent = selection.credit.role;
+  artworkDetailSource.href = selection.credit.sourceUrl;
+  const nextImage = selection.imageElement ?? artworkImageFallback;
+  if (nextImage !== artworkDetailImage) {
+    artworkDetailImage.removeAttribute("id");
+    artworkDetailImage = nextImage;
+    artworkDetailImage.id = "artwork-detail-image";
+    artworkDetailMedia.replaceChildren(artworkDetailImage);
+  }
+  if (!selection.imageElement && artworkDetailImage.getAttribute("src") !== selection.imageUrl) {
+    artworkDetailImage.src = selection.imageUrl;
+  }
+  artworkDetailImage.decoding = "async";
+  artworkDetailImage.draggable = false;
+  artworkDetailImage.alt = `Full view of ${selection.credit.title} by ${selection.credit.artist}`;
+  artworkDialog.showModal();
+  syncScrollerState();
+}
+
 function updateMotionControl(): void {
   motionControl.textContent = motionEnabled ? "MOTION—ON" : "MOTION—OFF";
   motionControl.setAttribute("aria-pressed", String(motionEnabled));
@@ -217,6 +253,7 @@ async function initialiseVisual(): Promise<void> {
       reducedMotion: reducedMotionQuery.matches,
       onStateChange: updateRecord,
       onInteractionStateChange: updateArtworkInteractionState,
+      onArtworkOpen: openArtworkDetail,
       onUnavailable: () => {
         visualLayer.classList.add("is-unavailable");
         visualLayer.classList.remove("is-ready");
@@ -300,9 +337,25 @@ companyControl.addEventListener("click", () => {
 bindDialogDismissal(companyDialog, companyControl, companyClose);
 bindDialogDismissal(creditsDialog, creditsControl, creditsClose);
 
+artworkClose.addEventListener("click", () => {
+  if (artworkDialog.open) artworkDialog.close();
+});
+
+artworkDialog.addEventListener("click", (event) => {
+  if (event.target !== artworkDialog) return;
+  const bounds = artworkDialog.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) artworkDialog.close();
+});
+
+artworkDialog.addEventListener("close", () => {
+  syncScrollerState();
+});
+
 window.addEventListener("keydown", (event) => {
   if (event.repeat) return;
-  if (companyDialog.open || creditsDialog.open) return;
+  if (companyDialog.open || creditsDialog.open || artworkDialog.open) return;
   const target = event.target;
   const isControl = target instanceof Element
     && target.closest("a, button, input, textarea, select, [contenteditable='true']") !== null;

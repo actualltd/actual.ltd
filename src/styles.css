@@ -485,6 +485,8 @@ html[data-art-active] .plate-gesture {
 .actual-mark:focus-visible,
 .company-close:focus-visible,
 .company-field a:focus-visible,
+.artwork-close:focus-visible,
+.artwork-dialog__source a:focus-visible,
 .credits-control:focus-visible,
 .credits-close:focus-visible,
 .credits-item:focus-visible {
@@ -873,6 +875,179 @@ html[data-art-active] .plate-gesture {
   transform: translate(0.14rem, -0.14rem);
 }
 
+.artwork-dialog {
+  position: fixed;
+  inset: 1rem;
+  width: calc(100vw - 2rem);
+  max-width: none;
+  height: calc(100svh - 2rem);
+  max-height: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 25vw);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--bone);
+  box-shadow: 0 2rem 8rem color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+.artwork-dialog[open] {
+  display: grid;
+}
+
+.artwork-dialog::backdrop {
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  backdrop-filter: grayscale(1);
+}
+
+.artwork-dialog__media {
+  --viewer-pad: clamp(1rem, 2vw, 2rem);
+  display: grid;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  place-items: center;
+  overflow: hidden;
+  border-right: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--ink) 7%, var(--bone));
+}
+
+.artwork-dialog__media img {
+  position: absolute;
+  inset: var(--viewer-pad);
+  display: block;
+  width: calc(100% - (var(--viewer-pad) * 2));
+  height: calc(100% - (var(--viewer-pad) * 2));
+  object-fit: contain;
+}
+
+.artwork-dialog__details {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 1fr auto auto;
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  text-transform: uppercase;
+}
+
+.artwork-dialog[open] .artwork-dialog__media {
+  animation: artwork-media-enter 220ms var(--ease-out) both;
+}
+
+.artwork-dialog[open] .artwork-dialog__details {
+  animation: artwork-details-enter 320ms var(--ease-out) both;
+}
+
+@keyframes artwork-media-enter {
+  from { transform: scale(0.995); filter: contrast(0.92); }
+  to { transform: scale(1); filter: contrast(1); }
+}
+
+@keyframes artwork-details-enter {
+  from { opacity: 0.72; transform: translateX(0.45rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.artwork-dialog__header,
+.artwork-dialog__source {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.artwork-dialog__header {
+  min-height: 3.4rem;
+  padding: 1rem;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.58rem;
+  font-weight: 590;
+  letter-spacing: 0.09em;
+}
+
+.artwork-close {
+  appearance: none;
+  padding: 0 0 0.35rem;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.artwork-dialog__title-block {
+  display: flex;
+  min-height: 0;
+  padding: 1rem;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.artwork-dialog__eyebrow {
+  margin-bottom: 0.65rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 580;
+  letter-spacing: 0.09em;
+}
+
+.artwork-dialog h2 {
+  margin: 0;
+  font-family: "Geist Variable", "Helvetica Neue", sans-serif;
+  font-size: clamp(2rem, 3.2vw, 3.8rem);
+  font-weight: 540;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.artwork-dialog__metadata {
+  padding: 0;
+  margin: 0;
+}
+
+.artwork-dialog__metadata > div {
+  display: grid;
+  min-height: 3.8rem;
+  padding: 0.8rem 1rem;
+  grid-template-columns: 4.5rem 1fr;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.artwork-dialog__metadata dt,
+.artwork-dialog__metadata dd,
+.artwork-dialog__source {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 590;
+  line-height: 1.35;
+  letter-spacing: 0.07em;
+}
+
+.artwork-dialog__metadata dt,
+.artwork-dialog__source > span {
+  color: var(--muted);
+}
+
+.artwork-dialog__source {
+  padding: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.artwork-dialog__source a {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--hairline);
+  color: inherit;
+  text-decoration: none;
+}
+
 @media (max-width: 700px) {
   :root {
     --edge: 1rem;
@@ -1010,6 +1185,34 @@ html[data-art-active] .plate-gesture {
     min-width: 10.2rem;
     min-height: 2.6rem;
     padding: 0 0.52rem 0.5rem 0;
+  }
+
+  .artwork-dialog {
+    inset: 0.5rem;
+    width: calc(100vw - 1rem);
+    height: calc(100svh - 1rem);
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(48svh, 1fr) auto;
+    overflow: auto;
+  }
+
+  .artwork-dialog__media {
+    --viewer-pad: 0.8rem;
+    min-height: 48svh;
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .artwork-dialog__details {
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .artwork-dialog__title-block {
+    min-height: 7rem;
+  }
+
+  .artwork-dialog h2 {
+    font-size: clamp(1.8rem, 10vw, 2.8rem);
   }
 }
 
