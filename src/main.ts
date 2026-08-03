@@ -3,11 +3,7 @@ import type { VisualController, VisualState } from "./visual";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
-
-  if (!element) {
-    throw new Error(`Missing required element: ${selector}`);
-  }
-
+  if (!element) throw new Error(`Missing required element: ${selector}`);
   return element;
 }
 
@@ -15,24 +11,48 @@ const visualLayer = requireElement<HTMLDivElement>("#visual-layer");
 const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
+const nextButton = requireElement<HTMLButtonElement>("#next-scene");
+const nextIndex = requireElement<HTMLSpanElement>("#next-index");
 const wordmark = requireElement<HTMLButtonElement>("#actual-wordmark");
-const storyStep = requireElement<HTMLSpanElement>("#story-step");
-const storyLine = requireElement<HTMLSpanElement>("#story-line");
-const storyDetail = requireElement<HTMLSpanElement>("#story-detail");
+const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
+const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
+const sceneTitle = requireElement<HTMLSpanElement>("#scene-title");
+const sceneArtist = requireElement<HTMLSpanElement>("#scene-artist");
+const sourceCredit = requireElement<HTMLAnchorElement>("#source-credit");
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-const STORY_COPY = [
-  { line: "POSSIBILITY", detail: "UNSEEN, BUT PRESENT." },
-  { line: "TAKING FORM", detail: "A SIGNAL BECOMES STRUCTURE." },
-  { line: "MADE ACTUAL", detail: "FORM, MADE PRESENT." },
-] as const;
 
 let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
-let revealLocked = false;
-let pointerInside = false;
-let focusInside = false;
 let visual: VisualController | null = null;
+
+function updateRecord(state: VisualState): void {
+  const nextNumber = state.index % 3 + 1;
+  indexElement.textContent = `[${state.code}/003]`;
+  labelElement.textContent = state.label;
+  sceneStep.textContent = `${state.code} / ${state.label}`;
+  sceneLine.textContent = state.line;
+  sceneTitle.textContent = state.title;
+  sceneArtist.textContent = `${state.artist} — ${state.date}`;
+  sourceCredit.textContent = state.sourceLabel;
+  sourceCredit.href = state.sourceUrl;
+  nextIndex.textContent = String(nextNumber).padStart(3, "0");
+  nextButton.setAttribute("aria-label", `Next artwork, record ${String(nextNumber).padStart(3, "0")}`);
+
+  if (!reducedMotionQuery.matches) {
+    const keyframes = [
+      { opacity: 0, transform: "translateY(0.35rem)" },
+      { opacity: 1, transform: "translateY(0)" },
+    ];
+    sceneLine.animate(keyframes, { duration: 620, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+    sceneArtist.animate(keyframes, { duration: 780, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+  }
+}
+
+function updateMotionControl(): void {
+  motionControl.textContent = motionEnabled ? "MOTION—ON" : "MOTION—OFF";
+  motionControl.setAttribute("aria-pressed", String(motionEnabled));
+  visual?.setMotionEnabled(motionEnabled);
+}
 
 async function initialiseVisual(): Promise<void> {
   try {
@@ -49,8 +69,7 @@ async function initialiseVisual(): Promise<void> {
       },
       onAvailable: () => {
         motionControl.disabled = false;
-        motionControl.textContent = motionEnabled ? "MOTION—ON" : "MOTION—OFF";
-        motionControl.setAttribute("aria-pressed", String(motionEnabled));
+        updateMotionControl();
       },
     });
   } catch {
@@ -61,78 +80,29 @@ async function initialiseVisual(): Promise<void> {
   }
 }
 
-function updateRecord(state: VisualState): void {
-  indexElement.textContent = `[${String(state.index).padStart(3, "0")}/003]`;
-  labelElement.textContent = state.label;
-  storyStep.textContent = `${String(state.index).padStart(2, "0")} — 03`;
-
-  const story = STORY_COPY[state.index - 1] ?? STORY_COPY[0];
-  storyLine.textContent = story.line;
-  storyDetail.textContent = story.detail;
-
-  if (!reducedMotionQuery.matches) {
-    const keyframes = [
-      { opacity: 0.2, transform: "translateY(0.22em)" },
-      { opacity: 1, transform: "translateY(0)" },
-    ];
-    storyLine.animate(keyframes, { duration: 620, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
-    storyDetail.animate(keyframes, { duration: 760, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
-  }
-}
-
-function updateMotionControl(): void {
-  motionControl.textContent = motionEnabled ? "MOTION—ON" : "MOTION—OFF";
-  motionControl.setAttribute("aria-pressed", String(motionEnabled));
-  visual?.setMotionEnabled(motionEnabled);
-}
-
-function updateReveal(): void {
-  const revealed = revealLocked || pointerInside || focusInside;
-  wordmark.classList.toggle("is-revealed", revealed);
-  wordmark.setAttribute("aria-expanded", String(revealed));
-  visual?.setReveal(revealed);
-}
-
-function updatePointer(event: PointerEvent): void {
-  visual?.setPointer(
-    Math.min(1, Math.max(0, event.clientX / window.innerWidth)),
-    Math.min(1, Math.max(0, 1 - event.clientY / window.innerHeight)),
-  );
-}
-
 motionControl.addEventListener("click", () => {
   motionEnabled = !motionEnabled;
   userMotionPreference = motionEnabled;
   updateMotionControl();
 });
 
-wordmark.addEventListener("pointerenter", (event) => {
-  pointerInside = event.pointerType !== "touch";
-  updatePointer(event);
-  updateReveal();
+nextButton.addEventListener("click", () => visual?.nextScene());
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowRight") visual?.nextScene();
+  else if (event.key === "ArrowLeft") visual?.previousScene();
 });
 
-wordmark.addEventListener("pointermove", updatePointer);
+window.addEventListener("pointermove", (event) => {
+  visual?.setPointer(event.clientX / window.innerWidth, event.clientY / window.innerHeight);
+}, { passive: true });
 
-wordmark.addEventListener("pointerleave", (event) => {
-  if (event.pointerType !== "touch") pointerInside = false;
-  updateReveal();
-});
-
-wordmark.addEventListener("focus", () => {
-  focusInside = wordmark.matches(":focus-visible");
-  visual?.setPointer(0.5, 0.5);
-  updateReveal();
-});
-
-wordmark.addEventListener("blur", () => {
-  focusInside = false;
-  updateReveal();
-});
+document.documentElement.addEventListener("pointerleave", () => visual?.setPointer(0.5, 0.5));
 
 wordmark.addEventListener("click", () => {
-  revealLocked = !revealLocked;
-  updateReveal();
+  const expanded = wordmark.getAttribute("aria-expanded") === "true";
+  wordmark.setAttribute("aria-expanded", String(!expanded));
+  wordmark.classList.toggle("is-revealed", !expanded);
 });
 
 reducedMotionQuery.addEventListener("change", (event) => {
@@ -142,21 +112,12 @@ reducedMotionQuery.addEventListener("change", (event) => {
   }
 });
 
-window.addEventListener(
-  "pagehide",
-  (event) => {
-    if (!event.persisted) visual?.destroy();
-  },
-  { once: true },
-);
+window.addEventListener("pagehide", (event) => {
+  if (!event.persisted) visual?.destroy();
+}, { once: true });
 
 updateMotionControl();
-updateReveal();
 
-window.addEventListener(
-  "load",
-  () => {
-    requestAnimationFrame(() => window.setTimeout(() => void initialiseVisual(), 120));
-  },
-  { once: true },
-);
+window.addEventListener("load", () => {
+  requestAnimationFrame(() => void initialiseVisual());
+}, { once: true });

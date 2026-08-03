@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#11100e" />
-    <meta name="description" content="ACTUAL is an independent company." />
+    <meta name="theme-color" content="#e7e0d4" />
+    <meta name="description" content="ACTUAL is an independent company. Three studies in force, motion, and presence." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="ACTUAL — Independent Company" />
-    <meta property="og:description" content="ACTUAL is an independent company." />
+    <meta property="og:description" content="Three studies in force, motion, and presence by ACTUAL." />
     <meta property="og:url" content="https://actual.ltd/" />
     <meta property="og:image" content="https://actual.ltd/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Possibility, taking form as a black-and-bone dithered object." />
+    <meta property="og:image:alt" content="A layered black-and-bone dithered study of Hokusai's Great Wave." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -27,7 +27,7 @@
       <header class="masthead">
         <div class="record-meta" aria-label="Visual record">
           <span id="record-index">[001/003]</span>
-          <span id="record-label">CONTOUR</span>
+          <span id="record-label">FORCE</span>
           <span class="density-ramp" aria-hidden="true">.:-=+*#%@</span>
         </div>
         <button class="motion-control" id="motion-control" type="button" aria-pressed="true">
@@ -37,25 +37,36 @@
 
       <h1 class="visually-hidden">ACTUAL</h1>
 
-      <section class="identity" aria-label="From possibility to something actual">
-        <button
-          class="story-trigger"
-          id="actual-wordmark"
-          type="button"
-          aria-expanded="false"
-          aria-controls="company-description"
-        >
-          <span class="story-step" id="story-step" aria-hidden="true">01 — 03</span>
-          <span class="story-line" id="story-line">POSSIBILITY</span>
-          <span class="story-detail" id="story-detail">UNSEEN, BUT PRESENT.</span>
-        </button>
-        <p class="company-description" id="company-description">
-          <span aria-hidden="true">[</span> INDEPENDENT COMPANY <span aria-hidden="true">]</span>
-        </p>
+      <section class="identity" aria-label="Artwork record" aria-live="polite">
+        <div class="scene-copy">
+          <span class="scene-step" id="scene-step">001 / FORCE</span>
+          <span class="scene-line" id="scene-line">THE WORLD ARRIVES IN WAVES.</span>
+          <span class="scene-caption">
+            <span id="scene-title">THE GREAT WAVE</span>
+            <span id="scene-artist">KATSUSHIKA HOKUSAI — C. 1830–32</span>
+          </span>
+        </div>
       </section>
 
+      <button class="scene-next" id="next-scene" type="button" aria-label="Next artwork, record 002">
+        <span class="next-glyph" aria-hidden="true">→</span>
+        <span class="next-index" id="next-index" aria-hidden="true">002</span>
+      </button>
+
       <footer class="footer">
-        <span class="edition">ACTUAL</span>
+        <div class="edition">
+          <button class="actual-mark" id="actual-wordmark" type="button" aria-expanded="false" aria-controls="company-description">
+            <span>ACTUAL</span>
+            <span class="company-description" id="company-description">INDEPENDENT COMPANY</span>
+          </button>
+          <a
+            class="source-credit"
+            id="source-credit"
+            href="https://www.metmuseum.org/art/collection/search/56353"
+            target="_blank"
+            rel="noreferrer"
+          >THE MET — PUBLIC DOMAIN</a>
+        </div>
         <a class="email" href="mailto:hello@actual.ltd">
           <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>
         </a>
@@ -64,7 +75,7 @@
       <noscript>
         <style>
           .motion-control { display: none; }
-          .company-description { opacity: 1; transform: translate(-50%, 0); }
+          .company-description { opacity: 1; transform: none; }
         </style>
       </noscript>
     </main>

@@ -1,63 +1,60 @@
-import {
-  Color,
-  GLSL3,
-  Mesh,
-  OrthographicCamera,
-  PlaneGeometry,
-  Scene,
-  ShaderMaterial,
-  SRGBColorSpace,
-  Vector2,
-  Vector4,
-  WebGLRenderer,
-} from "three";
-
 export interface VisualState {
   index: number;
   code: string;
   label: string;
-  duration: number;
-  transition: number;
-  field: Readonly<{
-    scale: number;
-    drift: number;
-    distortion: number;
-    contrast: number;
-    phase: number;
-  }>;
+  line: string;
+  title: string;
+  artist: string;
+  date: string;
+  imageUrl: string;
+  sourceLabel: string;
+  sourceUrl: string;
 }
 
 export const VISUAL_STATES: readonly VisualState[] = [
   {
     index: 1,
     code: "001",
-    label: "CONTOUR",
-    duration: 7_000,
-    transition: 1_200,
-    field: { scale: 1.82, drift: 0.032, distortion: 0.74, contrast: 1.12, phase: 0.0 },
+    label: "FORCE",
+    line: "THE WORLD ARRIVES IN WAVES.",
+    title: "THE GREAT WAVE",
+    artist: "KATSUSHIKA HOKUSAI",
+    date: "C. 1830–32",
+    imageUrl: "/art/great-wave.jpg",
+    sourceLabel: "THE MET — PUBLIC DOMAIN",
+    sourceUrl: "https://www.metmuseum.org/art/collection/search/56353",
   },
   {
     index: 2,
     code: "002",
-    label: "LATTICE",
-    duration: 7_000,
-    transition: 1_200,
-    field: { scale: 7.2, drift: 0.026, distortion: 0.46, contrast: 1.08, phase: 1.7 },
+    label: "MOTION",
+    line: "TIME, MADE VISIBLE.",
+    title: "HORSES. RUNNING",
+    artist: "EADWEARD MUYBRIDGE",
+    date: "C. 1881",
+    imageUrl: "/art/horses-running.jpg",
+    sourceLabel: "LIBRARY OF CONGRESS",
+    sourceUrl: "https://www.loc.gov/pictures/item/2008681069/",
   },
   {
     index: 3,
     code: "003",
-    label: "SIGNAL",
-    duration: 7_000,
-    transition: 1_200,
-    field: { scale: 4.7, drift: 0.021, distortion: 0.34, contrast: 1.16, phase: 3.1 },
+    label: "PRESENCE",
+    line: "THE WORLD, MADE PRESENT.",
+    title: "EARTHRISE",
+    artist: "WILLIAM ANDERS / APOLLO 8",
+    date: "24 DECEMBER 1968",
+    imageUrl: "/art/earthrise.jpg",
+    sourceLabel: "NASA — AS08-14-2383",
+    sourceUrl: "https://science.nasa.gov/resource/image-earthrise/",
   },
 ] as const;
 
 export interface VisualController {
   setMotionEnabled(enabled: boolean): void;
-  setReveal(active: boolean): void;
   setPointer(x: number, y: number): void;
+  nextScene(): void;
+  previousScene(): void;
   destroy(): void;
 }
 
@@ -68,480 +65,393 @@ interface VisualOptions {
   onAvailable?: () => void;
 }
 
-const VERTEX_SHADER = /* glsl */ `
-  out vec2 vUv;
+interface Crop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
-  void main() {
-    vUv = uv;
-    gl_Position = vec4(position.xy, 0.0, 1.0);
-  }
-`;
+type LayerShape = "rect" | "ellipse" | "slant-left" | "slant-right";
 
-const FRAGMENT_SHADER = /* glsl */ `
-  precision highp float;
-  precision highp int;
+interface Layer {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  crop: Crop;
+  depth: number;
+  opacity: number;
+  rotation?: number;
+  shape?: LayerShape;
+}
 
-  in vec2 vUv;
-  out vec4 outColor;
-  #define gl_FragColor outColor
+const BAYER_8 = [
+  0, 32, 8, 40, 2, 34, 10, 42,
+  48, 16, 56, 24, 50, 18, 58, 26,
+  12, 44, 4, 36, 14, 46, 6, 38,
+  60, 28, 52, 20, 62, 30, 54, 22,
+  3, 35, 11, 43, 1, 33, 9, 41,
+  51, 19, 59, 27, 49, 17, 57, 25,
+  15, 47, 7, 39, 13, 45, 5, 37,
+  63, 31, 55, 23, 61, 29, 53, 21,
+] as const;
 
-  uniform vec2 uResolution;
-  uniform vec2 uPointer;
-  uniform vec4 uCurrentParams;
-  uniform vec4 uNextParams;
-  uniform vec3 uInk;
-  uniform vec3 uPaper;
-  uniform float uCurrentPhase;
-  uniform float uNextPhase;
-  uniform float uCurrentState;
-  uniform float uNextState;
-  uniform float uStateMix;
-  uniform float uReveal;
-  uniform float uTime;
+const INK = [17, 16, 14] as const;
+const PAPER = [231, 224, 212] as const;
+const FULL_IMAGE: Crop = { x: 0, y: 0, width: 1, height: 1 };
+const FRAME_INTERVAL = 1000 / 24;
 
-  const int BAYER_8[64] = int[64](
-     0, 32,  8, 40,  2, 34, 10, 42,
-    48, 16, 56, 24, 50, 18, 58, 26,
-    12, 44,  4, 36, 14, 46,  6, 38,
-    60, 28, 52, 20, 62, 30, 54, 22,
-     3, 35, 11, 43,  1, 33,  9, 41,
-    51, 19, 59, 27, 49, 17, 57, 25,
-    15, 47,  7, 39, 13, 45,  5, 37,
-    63, 31, 55, 23, 61, 29, 53, 21
-  );
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
 
-  float hash21(vec2 p) {
-    p = fract(p * vec2(123.34, 345.45));
-    p += dot(p, p + 34.345);
-    return fract(p.x * p.y);
-  }
+function easeInOut(value: number): number {
+  return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
+}
 
-  float valueNoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
-      mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
-      u.y
-    );
-  }
-
-  float fbm(vec2 p) {
-    float value = 0.0;
-    float amplitude = 0.52;
-    mat2 rotation = mat2(0.80, -0.60, 0.60, 0.80);
-
-    for (int octave = 0; octave < 4; octave++) {
-      value += amplitude * valueNoise(p);
-      p = rotation * p * 2.03 + 13.7;
-      amplitude *= 0.5;
-    }
-
-    return value;
-  }
-
-  float contourField(vec2 p, vec4 params, float phase, float time) {
-    float localTime = time * params.y;
-    vec2 drift = vec2(localTime, -localTime * 0.63);
-    float broad = fbm(p * params.x + drift + phase);
-    float detail = fbm(p * (params.x * 2.25) - drift * 0.46 + phase * 1.9);
-    float terrain = mix(broad, detail, params.z * 0.24);
-    float bands = abs(fract(terrain * 6.0 + 0.08 * sin(p.y * 2.4)) - 0.5);
-    float contours = 1.0 - smoothstep(0.035, 0.115, bands);
-    float mass = smoothstep(0.27, 0.76, terrain);
-    return clamp(mass * 0.82 + contours * 0.48, 0.0, 1.0) * params.w;
-  }
-
-  float latticeField(vec2 p, vec4 params, float phase, float time) {
-    float localTime = time * params.y;
-    vec2 warp = vec2(
-      fbm(p * 1.35 + vec2(localTime, phase)) - 0.5,
-      fbm(p * 1.35 + vec2(phase, -localTime * 0.8)) - 0.5
-    );
-    vec2 q = p + warp * params.z;
-    float xLines = abs(sin((q.x * params.x + 0.16 * sin(q.y * 2.2) + localTime) * 3.14159265));
-    float yLines = abs(sin((q.y * params.x * 0.76 + 0.15 * sin(q.x * 2.5) - localTime * 0.8) * 3.14159265));
-    float weave = smoothstep(0.79, 0.97, max(xLines, yLines));
-    float interference = 0.5 + 0.5 * sin((q.x + q.y) * 9.0 + phase + localTime * 3.0);
-    return clamp((0.10 + weave * 0.74 + interference * 0.18) * params.w, 0.0, 1.0);
-  }
-
-  float signalField(vec2 p, vec4 params, float phase, float time) {
-    float localTime = time * params.y;
-    vec2 originA = vec2(-0.36, 0.08) + 0.035 * vec2(sin(localTime + phase), cos(localTime * 0.7));
-    vec2 originB = vec2(0.42, -0.17) + 0.025 * vec2(cos(localTime * 0.8), sin(localTime + phase));
-    float radiusA = length(p - originA);
-    float radiusB = length(p - originB);
-    float waveA = 0.5 + 0.5 * sin(radiusA * params.x * 12.0 - localTime * 3.0 + phase);
-    float waveB = 0.5 + 0.5 * sin(radiusB * params.x * 10.4 + localTime * 2.4 - phase);
-    float moire = mix(waveA, waveA * waveB, 0.64 + params.z * 0.3);
-    float envelope = 1.0 - smoothstep(0.48, 1.12, min(radiusA, radiusB));
-    return clamp((moire * 0.72 + envelope * 0.19) * params.w, 0.0, 1.0);
-  }
-
-  float stateField(float state, vec2 p, vec4 params, float phase, float time) {
-    if (state < 0.5) {
-      return contourField(p, params, phase, time);
-    }
-    if (state < 1.5) {
-      return latticeField(p, params, phase, time);
-    }
-    return signalField(p, params, phase, time);
-  }
-
-  float bayerThreshold() {
-    ivec2 matrixCell = ivec2(mod(floor(gl_FragCoord.xy), 8.0));
-    int matrixIndex = matrixCell.x + matrixCell.y * 8;
-    return (float(BAYER_8[matrixIndex]) + 0.5) / 64.0;
-  }
-
-  float objectDistance(float state, vec2 p, float time) {
-    if (state < 0.5) {
-      vec2 q = p * vec2(0.88, 1.08);
-      float edge = sin(q.x * 10.0 + time * 0.018) * sin(q.y * 8.0 - time * 0.012);
-      edge += 0.5 * sin((q.x + q.y) * 17.0 - time * 0.009);
-      return length(q) + edge * 0.016;
-    }
-    if (state < 1.5) {
-      vec2 q = abs(p * vec2(0.98, 1.04));
-      float squircle = pow(pow(q.x, 4.0) + pow(q.y, 4.0), 0.25);
-      return squircle + 0.012 * sin((p.x - p.y) * 18.0 + time * 0.025);
-    }
-    float angle = atan(p.y, p.x);
-    return length(p) + 0.012 * sin(angle * 8.0 + time * 0.018);
-  }
-
-  void main() {
-    float aspect = uResolution.x / max(uResolution.y, 1.0);
-    vec2 p = vUv - 0.5;
-    p.x *= aspect;
-
-    float stateMix = uStateMix * uStateMix * (3.0 - 2.0 * uStateMix);
-    float tone = stateField(uCurrentState, p, uCurrentParams, uCurrentPhase, uTime);
-    if (stateMix > 0.001) {
-      float nextField = stateField(uNextState, p, uNextParams, uNextPhase, uTime);
-      tone = mix(tone, nextField, stateMix);
-    }
-    tone = clamp(tone, 0.0, 1.0);
-
-    float currentDistance = objectDistance(uCurrentState, p, uTime);
-    float objectRadius = min(0.285, aspect * 0.36);
-    float shapeDistance = currentDistance;
-    if (stateMix > 0.001) {
-      float nextDistance = objectDistance(uNextState, p, uTime);
-      shapeDistance = mix(currentDistance, nextDistance, stateMix);
-    }
-    float objectMask = 1.0 - smoothstep(objectRadius - 0.006, objectRadius + 0.006, shapeDistance);
-
-    float dithered = step(bayerThreshold(), tone);
-    dithered = mix(1.0, dithered, objectMask);
-    vec2 pointer = uPointer - 0.5;
-    pointer.x *= aspect;
-    float pointerDistance = length(p - pointer);
-    float aperture = (1.0 - smoothstep(0.055, 0.31, pointerDistance)) * uReveal;
-    float quietTone = smoothstep(0.22, 0.78, tone);
-    float pixel = mix(dithered, quietTone, aperture * objectMask * 0.88);
-
-    outColor = vec4(mix(uInk, uPaper, pixel), 1.0);
-    #include <tonemapping_fragment>
-    #include <colorspace_fragment>
-  }
-`;
-
-const EMPTY_CONTROLLER: VisualController = {
-  setMotionEnabled: () => undefined,
-  setReveal: () => undefined,
-  setPointer: () => undefined,
-  destroy: () => undefined,
-};
-
-function stateParameters(state: VisualState): Vector4 {
-  const { scale, drift, distortion, contrast } = state.field;
-  return new Vector4(scale, drift, distortion, contrast);
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Unable to load ${url}`));
+    image.src = url;
+  });
 }
 
 export function createVisual(container: HTMLElement, options: VisualOptions): VisualController {
   const canvas = document.createElement("canvas");
   canvas.setAttribute("aria-hidden", "true");
   canvas.setAttribute("role", "presentation");
-  canvas.style.imageRendering = "pixelated";
-  canvas.style.pointerEvents = "none";
   container.append(canvas);
 
-  const contextAttributes: WebGLContextAttributes = {
-    alpha: false,
-    antialias: false,
-    depth: false,
-    desynchronized: true,
-    powerPreference: "high-performance",
-    premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
-    stencil: false,
-  };
+  const context = canvas.getContext("2d", { alpha: false, desynchronized: true, willReadFrequently: true });
+  const composition = document.createElement("canvas");
+  const compositionContext = composition.getContext("2d", { alpha: false, willReadFrequently: true });
 
-  const context = canvas.getContext("webgl2", contextAttributes);
-  if (!context) {
+  if (!context || !compositionContext) {
     canvas.remove();
     container.classList.add("is-unavailable");
     options.onUnavailable();
-    return EMPTY_CONTROLLER;
+    return {
+      setMotionEnabled: () => undefined,
+      setPointer: () => undefined,
+      nextScene: () => undefined,
+      previousScene: () => undefined,
+      destroy: () => undefined,
+    };
   }
 
-  let renderer: WebGLRenderer;
-  try {
-    renderer = new WebGLRenderer({
-      canvas,
-      context,
-      antialias: false,
-      alpha: false,
-      powerPreference: "high-performance",
-    });
-  } catch {
-    canvas.remove();
-    container.classList.add("is-unavailable");
-    options.onUnavailable();
-    return EMPTY_CONTROLLER;
-  }
-
-  renderer.outputColorSpace = SRGBColorSpace;
-  renderer.setClearColor(0xe7e0d4, 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * 0.58);
-
-  const uniforms = {
-    uResolution: { value: new Vector2(1, 1) },
-    uPointer: { value: new Vector2(0.5, 0.5) },
-    uCurrentParams: { value: stateParameters(VISUAL_STATES[0]) },
-    uNextParams: { value: stateParameters(VISUAL_STATES[1]) },
-    uInk: { value: new Color(0x11100e) },
-    uPaper: { value: new Color(0xe7e0d4) },
-    uCurrentPhase: { value: VISUAL_STATES[0].field.phase },
-    uNextPhase: { value: VISUAL_STATES[1].field.phase },
-    uCurrentState: { value: 0 },
-    uNextState: { value: 1 },
-    uStateMix: { value: 0 },
-    uReveal: { value: 0 },
-    uTime: { value: 0 },
-  };
-
-  const material = new ShaderMaterial({
-    glslVersion: GLSL3,
-    uniforms,
-    vertexShader: VERTEX_SHADER,
-    fragmentShader: FRAGMENT_SHADER,
-    depthTest: false,
-    depthWrite: false,
-    transparent: false,
-    toneMapped: true,
-  });
-  const geometry = new PlaneGeometry(2, 2);
-  const mesh = new Mesh(geometry, material);
-  mesh.frustumCulled = false;
-
-  const scene = new Scene();
-  scene.add(mesh);
-  const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  camera.position.z = 1;
-
+  const images: HTMLImageElement[] = [];
   let motionEnabled = options.motionEnabled;
   let destroyed = false;
-  let contextLost = false;
+  let loaded = false;
   let frameRequest = 0;
-  let lastFrameTime: number | undefined;
-  let lastRenderedAt = 0;
-  let elapsed = 0;
+  let lastFrameAt = 0;
   let activeStateIndex = 0;
-  let revealTarget = 0;
+  let previousStateIndex = 0;
+  let transitionStartedAt = -Infinity;
+  let pointerX = 0.5;
+  let pointerY = 0.5;
   let pointerTargetX = 0.5;
   let pointerTargetY = 0.5;
-  let unavailableNotified = false;
+  let elapsed = 0;
+  let lastTime: number | undefined;
 
-  const markUnavailable = (): void => {
-    container.classList.remove("is-ready");
-    container.classList.add("is-unavailable");
-    if (!unavailableNotified) {
-      unavailableNotified = true;
-      options.onUnavailable();
+  const hasTransition = (time: number): boolean => time - transitionStartedAt < 960;
+
+  const clipLayer = (ctx: CanvasRenderingContext2D, layer: Layer): void => {
+    const { x, y, width, height } = layer;
+    ctx.beginPath();
+    if (layer.shape === "ellipse") {
+      ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+    } else if (layer.shape === "slant-left") {
+      ctx.moveTo(x + width * 0.08, y);
+      ctx.lineTo(x + width, y + height * 0.03);
+      ctx.lineTo(x + width * 0.9, y + height);
+      ctx.lineTo(x, y + height * 0.92);
+      ctx.closePath();
+    } else if (layer.shape === "slant-right") {
+      ctx.moveTo(x, y + height * 0.05);
+      ctx.lineTo(x + width * 0.92, y);
+      ctx.lineTo(x + width, y + height * 0.9);
+      ctx.lineTo(x + width * 0.08, y + height);
+      ctx.closePath();
+    } else {
+      ctx.rect(x, y, width, height);
     }
+    ctx.clip();
   };
 
-  const updateStateUniforms = (): void => {
-    const cycleDuration = VISUAL_STATES[0].duration;
-    const cycleElapsed = elapsed % (cycleDuration * VISUAL_STATES.length);
-    const nextStateIndex = Math.floor(cycleElapsed / cycleDuration) % VISUAL_STATES.length;
-    const stateElapsed = cycleElapsed % cycleDuration;
-    const currentState = VISUAL_STATES[nextStateIndex];
-    const followingIndex = (nextStateIndex + 1) % VISUAL_STATES.length;
-    const followingState = VISUAL_STATES[followingIndex];
-    const transitionStart = currentState.duration - currentState.transition;
-    const transitionProgress = Math.max(
-      0,
-      Math.min(1, (stateElapsed - transitionStart) / currentState.transition),
-    );
+  const drawLayer = (
+    image: HTMLImageElement,
+    layer: Layer,
+    sceneAlpha: number,
+    time: number,
+    phase: number,
+  ): void => {
+    const pointerOffsetX = (pointerX - 0.5) * layer.depth * composition.width * 0.052;
+    const pointerOffsetY = (pointerY - 0.5) * layer.depth * composition.height * 0.045;
+    const driftX = motionEnabled ? Math.sin(time * 0.00013 + phase) * layer.depth * composition.width * 0.008 : 0;
+    const driftY = motionEnabled ? Math.cos(time * 0.00011 + phase * 1.4) * layer.depth * composition.height * 0.007 : 0;
+    const x = layer.x + pointerOffsetX + driftX;
+    const y = layer.y + pointerOffsetY + driftY;
+    const sourceX = layer.crop.x * image.naturalWidth;
+    const sourceY = layer.crop.y * image.naturalHeight;
+    const sourceWidth = layer.crop.width * image.naturalWidth;
+    const sourceHeight = layer.crop.height * image.naturalHeight;
 
-    uniforms.uCurrentState.value = nextStateIndex;
-    uniforms.uNextState.value = followingIndex;
-    uniforms.uStateMix.value = transitionProgress;
-    uniforms.uCurrentParams.value.set(
-      currentState.field.scale,
-      currentState.field.drift,
-      currentState.field.distortion,
-      currentState.field.contrast,
+    compositionContext.save();
+    compositionContext.globalAlpha = layer.opacity * sceneAlpha;
+    compositionContext.filter = "grayscale(1) contrast(1.14)";
+    compositionContext.translate(x + layer.width / 2, y + layer.height / 2);
+    compositionContext.rotate(layer.rotation ?? 0);
+    compositionContext.translate(-x - layer.width / 2, -y - layer.height / 2);
+    clipLayer(compositionContext, { ...layer, x, y });
+    compositionContext.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      x,
+      y,
+      layer.width,
+      layer.height,
     );
-    uniforms.uNextParams.value.set(
-      followingState.field.scale,
-      followingState.field.drift,
-      followingState.field.distortion,
-      followingState.field.contrast,
-    );
-    uniforms.uCurrentPhase.value = currentState.field.phase;
-    uniforms.uNextPhase.value = followingState.field.phase;
+    compositionContext.restore();
+  };
 
-    if (activeStateIndex !== nextStateIndex) {
-      activeStateIndex = nextStateIndex;
-      options.onStateChange(currentState);
+  const drawWave = (alpha: number, time: number): void => {
+    const image = images[0];
+    const width = Math.min(composition.width * 0.72, composition.height * 1.25);
+    const height = width * 0.675;
+    const x = composition.width * 0.5 - width * 0.5;
+    const y = composition.height * 0.47 - height * 0.5;
+
+    const layers: Layer[] = [
+      { x: x - width * 0.09, y: y + height * 0.02, width: width * 0.9, height: height * 0.9, crop: FULL_IMAGE, depth: 0.32, opacity: 0.22, rotation: -0.025, shape: "slant-left" },
+      { x: x + width * 0.03, y: y - height * 0.04, width: width * 0.94, height: height * 0.94, crop: FULL_IMAGE, depth: 0.58, opacity: 0.8, rotation: 0.012, shape: "slant-right" },
+      { x: x - width * 0.12, y: y + height * 0.01, width: width * 0.52, height: height * 0.72, crop: { x: 0.02, y: 0.06, width: 0.58, height: 0.82 }, depth: 1, opacity: 0.58, rotation: -0.018, shape: "slant-left" },
+      { x: x + width * 0.55, y: y + height * 0.45, width: width * 0.31, height: height * 0.29, crop: { x: 0.48, y: 0.42, width: 0.32, height: 0.28 }, depth: 0.78, opacity: 0.64, rotation: 0.032, shape: "rect" },
+    ];
+
+    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.9));
+  };
+
+  const horseCrop = (frame: number): Crop => {
+    const column = frame % 5;
+    const row = Math.floor(frame / 5) % 4;
+    return {
+      x: 0.247 + column * 0.108,
+      y: 0.292 + row * 0.118,
+      width: 0.099,
+      height: 0.101,
+    };
+  };
+
+  const drawHorses = (alpha: number, time: number): void => {
+    const image = images[1];
+    const width = Math.min(composition.width * 0.59, composition.height * 1.03);
+    const height = width * 0.79;
+    const x = composition.width * 0.5 - width * 0.5;
+    const y = composition.height * 0.42 - height * 0.5;
+    const frame = motionEnabled ? Math.floor(elapsed / 360) % 20 : 7;
+
+    const layers: Layer[] = [
+      { x: x - width * 0.08, y: y - height * 0.02, width: width * 0.89, height, crop: FULL_IMAGE, depth: 0.22, opacity: 0.24, rotation: -0.018, shape: "slant-right" },
+      { x: x + width * 0.08, y: y + height * 0.02, width: width * 0.84, height: height * 0.83, crop: { x: 0.19, y: 0.2, width: 0.62, height: 0.58 }, depth: 0.5, opacity: 0.74, rotation: 0.009, shape: "rect" },
+      { x: x - width * 0.1, y: y + height * 0.07, width: width * 0.31, height: height * 0.38, crop: horseCrop(frame), depth: 1, opacity: 0.74, rotation: -0.026, shape: "slant-left" },
+      { x: x + width * 0.68, y: y + height * 0.5, width: width * 0.27, height: height * 0.33, crop: horseCrop((frame + 6) % 20), depth: 0.82, opacity: 0.68, rotation: 0.034, shape: "slant-right" },
+      { x: x + width * 0.42, y: y - height * 0.1, width: width * 0.23, height: height * 0.28, crop: horseCrop((frame + 13) % 20), depth: 0.68, opacity: 0.5, rotation: -0.012, shape: "rect" },
+    ];
+
+    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.4));
+  };
+
+  const drawEarthrise = (alpha: number, time: number): void => {
+    const image = images[2];
+    const width = Math.min(composition.width * 0.72, composition.height * 1.18);
+    const height = width * 0.625;
+    const x = composition.width * 0.5 - width * 0.5;
+    const y = composition.height * 0.47 - height * 0.5;
+
+    const layers: Layer[] = [
+      { x: x - width * 0.06, y: y - height * 0.02, width: width * 0.96, height: height * 0.94, crop: FULL_IMAGE, depth: 0.15, opacity: 0.72, rotation: -0.012, shape: "slant-left" },
+      { x: x + width * 0.53, y: y + height * 0.03, width: width * 0.34, height: height * 0.48, crop: { x: 0.44, y: 0.15, width: 0.28, height: 0.5 }, depth: 0.92, opacity: 0.78, rotation: 0.02, shape: "ellipse" },
+      { x: x - width * 0.11, y: y + height * 0.62, width: width * 1.03, height: height * 0.3, crop: { x: 0, y: 0.67, width: 1, height: 0.3 }, depth: 1, opacity: 0.78, rotation: -0.016, shape: "slant-right" },
+      { x: x + width * 0.03, y: y + height * 0.12, width: width * 0.48, height: height * 0.36, crop: { x: 0.32, y: 0.12, width: 0.5, height: 0.48 }, depth: 0.48, opacity: 0.32, rotation: 0.012, shape: "rect" },
+    ];
+
+    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 2.1));
+  };
+
+  const drawScene = (sceneIndex: number, alpha: number, time: number): void => {
+    if (sceneIndex === 0) drawWave(alpha, time);
+    else if (sceneIndex === 1) drawHorses(alpha, time);
+    else drawEarthrise(alpha, time);
+  };
+
+  const applyDither = (): void => {
+    const frame = compositionContext.getImageData(0, 0, composition.width, composition.height);
+    const pixels = frame.data;
+    const width = composition.width;
+
+    for (let offset = 0, pixel = 0; offset < pixels.length; offset += 4, pixel += 1) {
+      const red = pixels[offset] ?? 255;
+      const green = pixels[offset + 1] ?? 255;
+      const blue = pixels[offset + 2] ?? 255;
+      const x = pixel % width;
+      const y = Math.floor(pixel / width);
+      const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
+      const tone = clamp((luminance - 0.055) / 0.9, 0, 1);
+      const threshold = ((BAYER_8[(x & 7) + (y & 7) * 8] ?? 0) + 0.5) / 64;
+      const usePaper = luminance > 0.985 || tone >= threshold;
+      const color = usePaper ? PAPER : INK;
+      pixels[offset] = color[0];
+      pixels[offset + 1] = color[1];
+      pixels[offset + 2] = color[2];
+      pixels[offset + 3] = 255;
     }
+
+    context.putImageData(frame, 0, 0);
   };
 
-  const render = (): void => {
-    if (destroyed || contextLost) return;
-    renderer.render(scene, camera);
+  const render = (time: number): void => {
+    if (!loaded || destroyed) return;
+    compositionContext.save();
+    compositionContext.setTransform(1, 0, 0, 1, 0, 0);
+    compositionContext.filter = "none";
+    compositionContext.globalAlpha = 1;
+    compositionContext.fillStyle = "#ffffff";
+    compositionContext.fillRect(0, 0, composition.width, composition.height);
+
+    if (hasTransition(time)) {
+      const progress = easeInOut(clamp((time - transitionStartedAt) / 960, 0, 1));
+      drawScene(previousStateIndex, 1 - progress, time);
+      drawScene(activeStateIndex, progress, time);
+    } else {
+      drawScene(activeStateIndex, 1, time);
+    }
+
+    compositionContext.restore();
+    applyDither();
   };
 
-  const shouldContinueInteraction = (): boolean => {
-    const pointer = uniforms.uPointer.value;
-    return (
-      Math.abs(uniforms.uReveal.value - revealTarget) > 0.002 ||
-      Math.abs(pointer.x - pointerTargetX) > 0.0005 ||
-      Math.abs(pointer.y - pointerTargetY) > 0.0005
-    );
-  };
+  const needsInteractionFrame = (): boolean =>
+    Math.abs(pointerX - pointerTargetX) > 0.0006 || Math.abs(pointerY - pointerTargetY) > 0.0006;
 
   const scheduleFrame = (): void => {
-    if (
-      frameRequest === 0 &&
-      !destroyed &&
-      !contextLost &&
-      !document.hidden &&
-      (motionEnabled || shouldContinueInteraction())
-    ) {
+    if (frameRequest === 0 && loaded && !destroyed && !document.hidden) {
       frameRequest = window.requestAnimationFrame(onFrame);
     }
   };
 
   function onFrame(time: number): void {
     frameRequest = 0;
-    if (destroyed || contextLost || document.hidden) {
-      lastFrameTime = undefined;
+    if (destroyed || document.hidden || !loaded) {
+      lastTime = undefined;
       return;
     }
 
-    const interactionActive = shouldContinueInteraction();
-    if (motionEnabled && !interactionActive && time - lastRenderedAt < 1000 / 30) {
-      scheduleFrame();
-      return;
+    if (lastTime !== undefined && motionEnabled) elapsed += Math.min(time - lastTime, 50);
+    lastTime = time;
+    pointerX += (pointerTargetX - pointerX) * 0.075;
+    pointerY += (pointerTargetY - pointerY) * 0.075;
+
+    const transitioning = hasTransition(time);
+    if (time - lastFrameAt >= FRAME_INTERVAL || transitioning || needsInteractionFrame()) {
+      render(time);
+      lastFrameAt = time;
     }
 
-    if (lastFrameTime !== undefined && motionEnabled) {
-      elapsed += Math.min(time - lastFrameTime, 50);
-    }
-    lastFrameTime = time;
-
-    const pointerEase = 0.095;
-    const revealEase = revealTarget > uniforms.uReveal.value ? 0.085 : 0.065;
-    uniforms.uPointer.value.x += (pointerTargetX - uniforms.uPointer.value.x) * pointerEase;
-    uniforms.uPointer.value.y += (pointerTargetY - uniforms.uPointer.value.y) * pointerEase;
-    uniforms.uReveal.value += (revealTarget - uniforms.uReveal.value) * revealEase;
-    uniforms.uTime.value = elapsed * 0.001;
-    updateStateUniforms();
-    render();
-    lastRenderedAt = time;
-
-    if (motionEnabled || shouldContinueInteraction()) scheduleFrame();
-    else lastFrameTime = undefined;
+    if (motionEnabled || transitioning || needsInteractionFrame()) scheduleFrame();
+    else lastTime = undefined;
   }
 
+  const goToScene = (nextIndex: number): void => {
+    if (destroyed || nextIndex === activeStateIndex) return;
+    previousStateIndex = activeStateIndex;
+    activeStateIndex = (nextIndex + VISUAL_STATES.length) % VISUAL_STATES.length;
+    transitionStartedAt = performance.now();
+    options.onStateChange(VISUAL_STATES[activeStateIndex]);
+    scheduleFrame();
+  };
+
   const resize = (): void => {
-    if (destroyed || contextLost) return;
+    if (destroyed) return;
     const bounds = container.getBoundingClientRect();
-    const width = Math.max(1, Math.round(bounds.width));
-    const height = Math.max(1, Math.round(bounds.height));
-    renderer.setSize(width, height, false);
-    renderer.getDrawingBufferSize(uniforms.uResolution.value);
-    render();
+    const renderWidth = Math.round(clamp(bounds.width * 0.52, 340, 740));
+    const renderHeight = Math.max(1, Math.round(renderWidth * (bounds.height / Math.max(bounds.width, 1))));
+    if (canvas.width === renderWidth && canvas.height === renderHeight) return;
+    canvas.width = renderWidth;
+    canvas.height = renderHeight;
+    composition.width = renderWidth;
+    composition.height = renderHeight;
+    context.imageSmoothingEnabled = false;
+    compositionContext.imageSmoothingEnabled = true;
+    render(performance.now());
   };
 
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container);
 
   const handleVisibilityChange = (): void => {
-    lastFrameTime = undefined;
+    lastTime = undefined;
     if (document.hidden) {
       if (frameRequest !== 0) window.cancelAnimationFrame(frameRequest);
       frameRequest = 0;
     } else {
-      render();
+      render(performance.now());
       scheduleFrame();
     }
   };
 
-  const handleContextLost = (event: Event): void => {
-    event.preventDefault();
-    contextLost = true;
-    if (frameRequest !== 0) window.cancelAnimationFrame(frameRequest);
-    frameRequest = 0;
-    lastFrameTime = undefined;
-    markUnavailable();
-  };
-
-  const handleContextRestored = (): void => {
-    contextLost = false;
-    unavailableNotified = false;
-    renderer.resetState();
-    container.classList.remove("is-unavailable");
-    container.classList.add("is-ready");
-    options.onAvailable?.();
-    resize();
-    scheduleFrame();
-  };
-
   document.addEventListener("visibilitychange", handleVisibilityChange);
-  canvas.addEventListener("webglcontextlost", handleContextLost);
-  canvas.addEventListener("webglcontextrestored", handleContextRestored);
-
   resize();
-  updateStateUniforms();
   options.onStateChange(VISUAL_STATES[0]);
-  render();
-  container.classList.remove("is-unavailable");
-  container.classList.add("is-ready");
-  options.onAvailable?.();
-  scheduleFrame();
+
+  void Promise.all(VISUAL_STATES.map((state) => loadImage(state.imageUrl)))
+    .then((loadedImages) => {
+      if (destroyed) return;
+      images.push(...loadedImages);
+      loaded = true;
+      container.classList.remove("is-unavailable");
+      container.classList.add("is-ready");
+      options.onAvailable?.();
+      resize();
+      render(performance.now());
+      scheduleFrame();
+    })
+    .catch(() => {
+      if (destroyed) return;
+      container.classList.add("is-unavailable");
+      options.onUnavailable();
+    });
 
   return {
     setMotionEnabled(enabled: boolean): void {
       if (destroyed || motionEnabled === enabled) return;
       motionEnabled = enabled;
-      lastFrameTime = undefined;
-      if (!enabled && frameRequest !== 0 && !shouldContinueInteraction()) {
-        window.cancelAnimationFrame(frameRequest);
-        frameRequest = 0;
-      }
-      render();
-      scheduleFrame();
-    },
-
-    setReveal(active: boolean): void {
-      if (destroyed) return;
-      revealTarget = active ? 1 : 0;
+      lastTime = undefined;
+      render(performance.now());
       scheduleFrame();
     },
 
     setPointer(x: number, y: number): void {
       if (destroyed) return;
-      pointerTargetX = Math.min(1, Math.max(0, x));
-      pointerTargetY = Math.min(1, Math.max(0, y));
+      pointerTargetX = clamp(x, 0, 1);
+      pointerTargetY = clamp(y, 0, 1);
       scheduleFrame();
+    },
+
+    nextScene(): void {
+      goToScene(activeStateIndex + 1);
+    },
+
+    previousScene(): void {
+      goToScene(activeStateIndex - 1);
     },
 
     destroy(): void {
@@ -550,12 +460,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       if (frameRequest !== 0) window.cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      canvas.removeEventListener("webglcontextlost", handleContextLost);
-      canvas.removeEventListener("webglcontextrestored", handleContextRestored);
       container.classList.remove("is-ready");
-      material.dispose();
-      geometry.dispose();
-      renderer.dispose();
       canvas.remove();
     },
   };
