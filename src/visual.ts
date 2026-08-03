@@ -120,6 +120,7 @@ interface VisualOptions {
   onStateChange: (state: VisualState) => void;
   onUnavailable: () => void;
   onAvailable?: () => void;
+  onInteractionStateChange?: (active: boolean) => void;
 }
 
 type LayerRole = ArtworkCredit["role"];
@@ -162,8 +163,6 @@ interface LayerRecord {
   userOffsetX: number;
   userOffsetY: number;
   userScale: number;
-  maxOffsetX: number;
-  maxOffsetY: number;
   minScale: number;
   maxScale: number;
 }
@@ -185,10 +184,11 @@ const INK = new Vector4(20 / 255, 18 / 255, 15 / 255, 1);
 const ROLE_LAYERS: Record<LayerRole, number> = { environment: 0, figure: 1, object: 2 };
 const EFFECT_LAYER = 3;
 const MAX_DPR = 1.35;
-const MANIPULATION_LIMITS: Record<LayerRole, { moveX: number; moveY: number; minScale: number; maxScale: number }> = {
-  environment: { moveX: 0.025, moveY: 0.018, minScale: 0.94, maxScale: 1.06 },
-  figure: { moveX: 0.10, moveY: 0.075, minScale: 0.82, maxScale: 1.20 },
-  object: { moveX: 0.16, moveY: 0.12, minScale: 0.72, maxScale: 1.32 },
+const PAGE_EDGE_INSET = 24;
+const SCALE_LIMITS: Record<LayerRole, { minScale: number; maxScale: number }> = {
+  environment: { minScale: 0.94, maxScale: 1.06 },
+  figure: { minScale: 0.82, maxScale: 1.20 },
+  object: { minScale: 0.72, maxScale: 1.32 },
 };
 
 const sharedDither = {
@@ -344,14 +344,19 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   let dragPending = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let dragLastX = 0;
-  let dragLastY = 0;
+  let dragOriginOffsetX = 0;
+  let dragOriginOffsetY = 0;
+  let dragParallaxOffsetX = 0;
+  let dragParallaxOffsetY = 0;
   let lastPointerX = 0;
   let lastPointerY = 0;
   let lastTapTime = 0;
   let lastTapRole: LayerRole | null = null;
   let gestureLayer: LayerRecord | null = null;
   let gestureStartScale = 1;
+  let resizingArtwork = false;
+  let resizeEndTimer = 0;
+  let interactionActive = false;
 
   const parallaxTargetX = motionValue(0);
   const parallaxTargetY = motionValue(0);
@@ -413,6 +418,13 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     frame = window.requestAnimationFrame(render);
   };
 
+  const syncInteractionState = (): void => {
+    const active = resizingArtwork || (draggingLayer !== null && !dragPending);
+    if (interactionActive === active) return;
+    interactionActive = active;
+    options.onInteractionStateChange?.(active);
+  };
+
   const setVisibleRecord = (index: number): void => {
     records.forEach((record, recordIndex) => {
       if (record) record.group.visible = recordIndex === index;
@@ -422,6 +434,8 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     hoveredLayer = null;
     draggingLayer = null;
     draggingPointerId = -1;
+    dragPending = false;
+    syncInteractionState();
     delete stage.dataset.activeLayer;
     delete document.documentElement.dataset.artActive;
     delete document.documentElement.dataset.artDragging;
@@ -496,7 +510,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         mesh.rotation.z = ((layer.layout.rotation ?? 0) * Math.PI) / 180;
         mesh.layers.set(ROLE_LAYERS[layer.role]);
         group.add(mesh);
-        const limits = MANIPULATION_LIMITS[layer.role];
+        const limits = SCALE_LIMITS[layer.role];
         record.layers.push({
           role: layer.role,
           mesh,
@@ -508,8 +522,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
           userOffsetX: 0,
           userOffsetY: 0,
           userScale: 1,
-          maxOffsetX: 0,
-          maxOffsetY: 0,
           minScale: limits.minScale,
           maxScale: limits.maxScale,
         });
@@ -557,6 +569,52 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     });
   };
 
+  const layerHalfExtents = (layer: LayerRecord): { x: number; y: number } => {
+    const angle = layer.mesh.rotation.z;
+    const cosine = Math.abs(Math.cos(angle));
+    const sine = Math.abs(Math.sin(angle));
+    return {
+      x: (layer.baseScaleX * cosine + layer.baseScaleY * sine) * layer.userScale * 0.5,
+      y: (layer.baseScaleX * sine + layer.baseScaleY * cosine) * layer.userScale * 0.5,
+    };
+  };
+
+  const constrainLayerToPage = (layer: LayerRecord): void => {
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+    const aspect = width / height;
+    const marginX = (PAGE_EDGE_INSET / width) * aspect * 2;
+    const marginY = (PAGE_EDGE_INSET / height) * 2;
+    const half = layerHalfExtents(layer);
+    const minimumX = -aspect + marginX + half.x - layer.baseX;
+    const maximumX = aspect - marginX - half.x - layer.baseX;
+    const minimumY = -1 + marginY + half.y - layer.baseY;
+    const maximumY = 1 - marginY - half.y - layer.baseY;
+    layer.userOffsetX = minimumX <= maximumX
+      ? Math.max(minimumX, Math.min(maximumX, layer.userOffsetX))
+      : -layer.baseX;
+    layer.userOffsetY = minimumY <= maximumY
+      ? Math.max(minimumY, Math.min(maximumY, layer.userOffsetY))
+      : -layer.baseY;
+  };
+
+  const layerScreenBounds = (layer: LayerRecord): { left: number; top: number; right: number; bottom: number } => {
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+    const aspect = width / height;
+    const half = layerHalfExtents(layer);
+    const centerX = ((layer.baseX + layer.userOffsetX + aspect) / (aspect * 2)) * width;
+    const centerY = (1 - (layer.baseY + layer.userOffsetY + 1) / 2) * height;
+    const halfWidth = (half.x / (aspect * 2)) * width;
+    const halfHeight = (half.y / 2) * height;
+    return {
+      left: centerX - halfWidth,
+      top: centerY - halfHeight,
+      right: centerX + halfWidth,
+      bottom: centerY + halfHeight,
+    };
+  };
+
   const applyLayout = (): void => {
     if (!renderer || !camera) return;
     const width = Math.max(stage.clientWidth, 1);
@@ -592,15 +650,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         layer.baseY = plateWorldHeight * layout.y;
         layer.baseScaleX = meshWidth;
         layer.baseScaleY = meshHeight;
-        const limits = MANIPULATION_LIMITS[layer.role];
-        layer.maxOffsetX = plateWorldWidth * limits.moveX;
-        layer.maxOffsetY = plateWorldHeight * limits.moveY;
-        layer.userOffsetX = Math.max(-layer.maxOffsetX, Math.min(layer.maxOffsetX, layer.userOffsetX));
-        layer.userOffsetY = Math.max(-layer.maxOffsetY, Math.min(layer.maxOffsetY, layer.userOffsetY));
+        layer.mesh.rotation.z = (((compact ? layerConfig.mobile.rotation : layerConfig.layout.rotation) ?? 0) * Math.PI) / 180;
+        constrainLayerToPage(layer);
         layer.mesh.position.x = layer.baseX + layer.userOffsetX;
         layer.mesh.position.y = layer.baseY + layer.userOffsetY;
         layer.mesh.scale.set(meshWidth * layer.userScale, meshHeight * layer.userScale, 1);
-        layer.mesh.rotation.z = (((compact ? layerConfig.mobile.rotation : layerConfig.layout.rotation) ?? 0) * Math.PI) / 180;
       });
     });
 
@@ -627,6 +681,37 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     }
   };
 
+  const getLayerParallax = (layer: LayerRecord): { x: number; y: number } => {
+    if (!motionEnabled) return { x: 0, y: 0 };
+    const depth = layer.role === "environment" ? 0.010 : layer.role === "figure" ? 0.022 : 0.035;
+    return { x: resolvedParallaxX * depth, y: -resolvedParallaxY * depth * 0.55 };
+  };
+
+  const getLayerAmbientMotion = (layer: LayerRecord, elapsed: number): { x: number; y: number; scale: number } => {
+    if (!motionEnabled) return { x: 0, y: 0, scale: 1 };
+    let x = 0;
+    let y = 0;
+    let scale = 1;
+    const effect = SCENES[activeSceneIndex]?.effect;
+    if (effect === "crop" && layer.role === "environment") {
+      scale = 1 + (Math.sin(elapsed * 0.23) + 1) * 0.004;
+    } else if (effect === "sequence" && layer.role === "figure") {
+      x += Math.sin(elapsed * 0.34) * 0.012;
+    } else if (effect === "sequence" && layer.role === "object") {
+      x -= Math.sin(elapsed * 0.34) * 0.018;
+    } else if (effect === "scan" && layer.role === "object") {
+      x += Math.cos(elapsed * 0.28) * 0.014;
+      y += Math.sin(elapsed * 0.28) * 0.010;
+    }
+    return { x, y, scale };
+  };
+
+  const getLayerMotion = (layer: LayerRecord, elapsed: number): { x: number; y: number; scale: number } => {
+    const parallax = getLayerParallax(layer);
+    const ambient = getLayerAmbientMotion(layer, elapsed);
+    return { x: parallax.x + ambient.x, y: parallax.y + ambient.y, scale: ambient.scale };
+  };
+
   function render(time: number): void {
     frame = 0;
     if (!ready || destroyed || contextLost || document.hidden || !renderer || !camera || !scene || !quad || !ditherMaterial || !compositeMaterial || !scratchTarget || !rawTarget || !effectsTarget) return;
@@ -637,30 +722,19 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     if (!record) return;
 
     record.layers.forEach((layer) => {
-      const depth = layer.role === "environment" ? 0.010 : layer.role === "figure" ? 0.022 : 0.035;
-      const motionX = motionEnabled ? resolvedParallaxX * depth : 0;
-      const motionY = motionEnabled ? -resolvedParallaxY * depth * 0.55 : 0;
-      layer.mesh.position.x = layer.baseX + layer.userOffsetX + motionX;
-      layer.mesh.position.y = layer.baseY + layer.userOffsetY + motionY;
-      layer.mesh.scale.set(layer.baseScaleX * layer.userScale, layer.baseScaleY * layer.userScale, 1);
+      const isDirectDrag = layer === draggingLayer && !dragPending;
+      const ambient = isDirectDrag ? getLayerAmbientMotion(layer, elapsed) : null;
+      const layerMotion = ambient
+        ? { x: dragParallaxOffsetX + ambient.x, y: dragParallaxOffsetY + ambient.y, scale: ambient.scale }
+        : getLayerMotion(layer, elapsed);
+      layer.mesh.position.x = layer.baseX + layer.userOffsetX + layerMotion.x;
+      layer.mesh.position.y = layer.baseY + layer.userOffsetY + layerMotion.y;
+      layer.mesh.scale.set(
+        layer.baseScaleX * layer.userScale * layerMotion.scale,
+        layer.baseScaleY * layer.userScale * layerMotion.scale,
+        1,
+      );
     });
-
-    if (motionEnabled) {
-      const config = SCENES[activeSceneIndex];
-      const environment = record.layers.find((layer) => layer.role === "environment");
-      const figure = record.layers.find((layer) => layer.role === "figure");
-      const object = record.layers.find((layer) => layer.role === "object");
-      if (config.effect === "crop" && environment) {
-        const breathe = 1 + (Math.sin(elapsed * 0.23) + 1) * 0.004;
-        environment.mesh.scale.set(environment.baseScaleX * environment.userScale * breathe, environment.baseScaleY * environment.userScale * breathe, 1);
-      } else if (config.effect === "sequence") {
-        if (figure) figure.mesh.position.x += Math.sin(elapsed * 0.34) * 0.012;
-        if (object) object.mesh.position.x -= Math.sin(elapsed * 0.34) * 0.018;
-      } else if (config.effect === "scan" && object) {
-        object.mesh.position.x += Math.cos(elapsed * 0.28) * 0.014;
-        object.mesh.position.y += Math.sin(elapsed * 0.28) * 0.010;
-      }
-    }
 
     renderer.setClearColor(0x000000, 0);
     renderer.autoClear = true;
@@ -810,9 +884,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
   const syncManipulationDataset = (layer: LayerRecord): void => {
+    const bounds = layerScreenBounds(layer);
     stage.dataset.activeLayer = layer.role;
     stage.dataset.layerScale = layer.userScale.toFixed(3);
     stage.dataset.layerOffset = `${layer.userOffsetX.toFixed(4)},${layer.userOffsetY.toFixed(4)}`;
+    stage.dataset.layerBounds = `${bounds.left.toFixed(1)},${bounds.top.toFixed(1)},${bounds.right.toFixed(1)},${bounds.bottom.toFixed(1)}`;
     stage.dataset.manipulated = "true";
   };
 
@@ -830,20 +906,12 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   const hitTestLayer = (clientX: number, clientY: number): LayerRecord | null => {
     const record = records[activeSceneIndex];
     if (!record) return null;
-    const width = Math.max(stage.clientWidth, 1);
-    const height = Math.max(stage.clientHeight, 1);
-    if (clientX < platePixels.x - 48 || clientX > platePixels.x + platePixels.width + 48
-      || clientY < platePixels.y - 48 || clientY > platePixels.y + platePixels.height + 48) return null;
-    const aspect = width / height;
     const priority: readonly LayerRole[] = ["object", "figure", "environment"];
     for (const role of priority) {
       const layer = record.layers.find((candidate) => candidate.role === role);
       if (!layer) continue;
-      const centerX = ((layer.baseX + layer.userOffsetX + aspect) / (aspect * 2)) * width;
-      const centerY = (1 - (layer.baseY + layer.userOffsetY + 1) / 2) * height;
-      const halfWidth = (layer.baseScaleX * layer.userScale / (aspect * 2)) * width * 0.5;
-      const halfHeight = (layer.baseScaleY * layer.userScale / 2) * height * 0.5;
-      if (Math.abs(clientX - centerX) <= halfWidth && Math.abs(clientY - centerY) <= halfHeight) return layer;
+      const bounds = layerScreenBounds(layer);
+      if (clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom) return layer;
     }
     return null;
   };
@@ -852,26 +920,65 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const width = Math.max(stage.clientWidth, 1);
     const height = Math.max(stage.clientHeight, 1);
     const aspect = width / height;
-    layer.userOffsetX = clamp(layer.userOffsetX + (deltaX / width) * aspect * 2, -layer.maxOffsetX, layer.maxOffsetX);
-    layer.userOffsetY = clamp(layer.userOffsetY - (deltaY / height) * 2, -layer.maxOffsetY, layer.maxOffsetY);
+    layer.userOffsetX += (deltaX / width) * aspect * 2;
+    layer.userOffsetY -= (deltaY / height) * 2;
+    constrainLayerToPage(layer);
     syncManipulationDataset(layer);
+    requestRender();
+  };
+
+  const moveDraggedLayer = (layer: LayerRecord, clientX: number, clientY: number): void => {
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+    const aspect = width / height;
+    layer.userOffsetX = dragOriginOffsetX + ((clientX - dragStartX) / width) * aspect * 2;
+    layer.userOffsetY = dragOriginOffsetY - ((clientY - dragStartY) / height) * 2;
+    constrainLayerToPage(layer);
     requestRender();
   };
 
   const scaleLayer = (layer: LayerRecord, scale: number): void => {
     layer.userScale = clamp(scale, layer.minScale, layer.maxScale);
+    constrainLayerToPage(layer);
     syncManipulationDataset(layer);
     requestRender();
+  };
+
+  const setResizingArtwork = (active: boolean): void => {
+    if (resizingArtwork === active) return;
+    resizingArtwork = active;
+    stage.dataset.resizing = String(active);
+    if (active) document.documentElement.dataset.artResizing = "true";
+    else delete document.documentElement.dataset.artResizing;
+    syncInteractionState();
+  };
+
+  const scheduleResizeEnd = (): void => {
+    if (resizeEndTimer !== 0) window.clearTimeout(resizeEndTimer);
+    resizeEndTimer = window.setTimeout(() => {
+      resizeEndTimer = 0;
+      setResizingArtwork(false);
+    }, 140);
   };
 
   const resetLayer = (layer: LayerRecord): void => {
     const fromX = layer.userOffsetX;
     const fromY = layer.userOffsetY;
     const fromScale = layer.userScale;
+    layer.userOffsetX = 0;
+    layer.userOffsetY = 0;
+    layer.userScale = 1;
+    constrainLayerToPage(layer);
+    const targetX = layer.userOffsetX;
+    const targetY = layer.userOffsetY;
+    layer.userOffsetX = fromX;
+    layer.userOffsetY = fromY;
+    layer.userScale = fromScale;
     const update = (progress: number): void => {
-      layer.userOffsetX = fromX * (1 - progress);
-      layer.userOffsetY = fromY * (1 - progress);
+      layer.userOffsetX = fromX + (targetX - fromX) * progress;
+      layer.userOffsetY = fromY + (targetY - fromY) * progress;
       layer.userScale = fromScale + (1 - fromScale) * progress;
+      constrainLayerToPage(layer);
       syncManipulationDataset(layer);
       requestRender();
     };
@@ -880,8 +987,20 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+  const isInterfaceTarget = (target: EventTarget | null): boolean => (
+    target instanceof Element && target.closest("button, a") !== null
+  );
+
+  const beginDirectDrag = (layer: LayerRecord): void => {
+    const parallax = getLayerParallax(layer);
+    dragParallaxOffsetX = parallax.x;
+    dragParallaxOffsetY = parallax.y;
+    document.documentElement.dataset.artDragging = layer.role;
+    syncInteractionState();
+  };
+
   const onPointerDown = (event: PointerEvent): void => {
-    if (!event.isPrimary || event.button !== 0) return;
+    if (!event.isPrimary || event.button !== 0 || isInterfaceTarget(event.target)) return;
     const layer = hitTestLayer(event.clientX, event.clientY);
     if (!layer) return;
     draggingLayer = layer;
@@ -889,11 +1008,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     dragPending = event.pointerType === "touch";
     dragStartX = event.clientX;
     dragStartY = event.clientY;
-    dragLastX = event.clientX;
-    dragLastY = event.clientY;
+    dragOriginOffsetX = layer.userOffsetX;
+    dragOriginOffsetY = layer.userOffsetY;
     setHoveredLayer(layer);
     if (!dragPending) {
-      document.documentElement.dataset.artDragging = layer.role;
+      beginDirectDrag(layer);
       event.preventDefault();
     }
   };
@@ -913,21 +1032,20 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
         if (Math.hypot(totalX, totalY) >= 7) {
           if (Math.abs(totalX) > Math.abs(totalY) * 1.12) {
             dragPending = false;
-            document.documentElement.dataset.artDragging = draggingLayer.role;
+            beginDirectDrag(draggingLayer);
           } else if (Math.abs(totalY) > Math.abs(totalX)) {
             draggingLayer = null;
             draggingPointerId = -1;
+            syncInteractionState();
           }
         }
       }
       if (draggingLayer && !dragPending) {
-        moveLayer(draggingLayer, event.clientX - dragLastX, event.clientY - dragLastY);
+        moveDraggedLayer(draggingLayer, event.clientX, event.clientY);
         event.preventDefault();
       }
-      dragLastX = event.clientX;
-      dragLastY = event.clientY;
     } else if (event.pointerType !== "touch") {
-      setHoveredLayer(hitTestLayer(event.clientX, event.clientY));
+      setHoveredLayer(isInterfaceTarget(event.target) ? null : hitTestLayer(event.clientX, event.clientY));
     }
 
     if (!compositeMaterial || !finePointer.matches) return;
@@ -943,10 +1061,18 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     if (event.pointerId !== draggingPointerId) return;
     const releasedLayer = draggingLayer;
     const wasTap = dragPending;
+    if (releasedLayer && !wasTap) {
+      const currentParallax = getLayerParallax(releasedLayer);
+      releasedLayer.userOffsetX += dragParallaxOffsetX - currentParallax.x;
+      releasedLayer.userOffsetY += dragParallaxOffsetY - currentParallax.y;
+      constrainLayerToPage(releasedLayer);
+      syncManipulationDataset(releasedLayer);
+    }
     draggingLayer = null;
     draggingPointerId = -1;
     dragPending = false;
     delete document.documentElement.dataset.artDragging;
+    syncInteractionState();
     if (event.pointerType === "touch" && wasTap && releasedLayer) {
       const now = performance.now();
       if (lastTapRole === releasedLayer.role && now - lastTapTime < 340) resetLayer(releasedLayer);
@@ -957,10 +1083,20 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const onWheel = (event: WheelEvent): void => {
+    if (resizingArtwork) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.ctrlKey) scheduleResizeEnd();
+      else return;
+    }
+    if (isInterfaceTarget(event.target)) return;
     const layer = hitTestLayer(event.clientX, event.clientY) ?? hoveredLayer;
     if (!layer) return;
     if (event.ctrlKey) {
       event.preventDefault();
+      event.stopImmediatePropagation();
+      setResizingArtwork(true);
+      scheduleResizeEnd();
       scaleLayer(layer, layer.userScale * Math.exp(-event.deltaY * 0.004));
       setHoveredLayer(layer);
     } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 0.72 && Math.abs(event.deltaX) > 1) {
@@ -971,26 +1107,38 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const onDoubleClick = (event: MouseEvent): void => {
+    if (isInterfaceTarget(event.target)) return;
     const layer = hitTestLayer(event.clientX, event.clientY);
     if (layer) resetLayer(layer);
   };
 
   const onGestureStart = (event: MagnifyGestureEvent): void => {
+    if (isInterfaceTarget(event.target)) return;
     gestureLayer = hitTestLayer(event.clientX || lastPointerX, event.clientY || lastPointerY);
     if (!gestureLayer) return;
     gestureStartScale = gestureLayer.userScale;
     setHoveredLayer(gestureLayer);
+    if (resizeEndTimer !== 0) {
+      window.clearTimeout(resizeEndTimer);
+      resizeEndTimer = 0;
+    }
+    setResizingArtwork(true);
     event.preventDefault();
+    event.stopImmediatePropagation();
   };
 
   const onGestureChange = (event: MagnifyGestureEvent): void => {
     if (!gestureLayer) return;
     event.preventDefault();
+    event.stopImmediatePropagation();
     scaleLayer(gestureLayer, gestureStartScale * event.scale);
   };
 
-  const onGestureEnd = (): void => {
+  const onGestureEnd = (event: Event): void => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
     gestureLayer = null;
+    setResizingArtwork(false);
   };
 
   const onManipulationKeyDown = (event: KeyboardEvent): void => {
@@ -1024,12 +1172,12 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerUp);
   window.addEventListener("pointerleave", onPointerLeave);
-  window.addEventListener("wheel", onWheel, { passive: false });
+  window.addEventListener("wheel", onWheel, { passive: false, capture: true });
   window.addEventListener("dblclick", onDoubleClick);
   window.addEventListener("keydown", onManipulationKeyDown);
-  window.addEventListener("gesturestart", onGestureStart as EventListener, { passive: false });
-  window.addEventListener("gesturechange", onGestureChange as EventListener, { passive: false });
-  window.addEventListener("gestureend", onGestureEnd as EventListener);
+  window.addEventListener("gesturestart", onGestureStart as EventListener, { passive: false, capture: true });
+  window.addEventListener("gesturechange", onGestureChange as EventListener, { passive: false, capture: true });
+  window.addEventListener("gestureend", onGestureEnd as EventListener, { passive: false, capture: true });
   window.addEventListener("resize", onResize, { passive: true });
   document.addEventListener("visibilitychange", onVisibilityChange);
   options.onStateChange(VISUAL_STATES[0]);
@@ -1063,17 +1211,22 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       ready = false;
       registrationAnimation?.stop();
       if (frame) window.cancelAnimationFrame(frame);
+      if (resizeEndTimer !== 0) window.clearTimeout(resizeEndTimer);
+      draggingLayer = null;
+      dragPending = false;
+      setResizingArtwork(false);
+      syncInteractionState();
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("pointerleave", onPointerLeave);
-      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("wheel", onWheel, true);
       window.removeEventListener("dblclick", onDoubleClick);
       window.removeEventListener("keydown", onManipulationKeyDown);
-      window.removeEventListener("gesturestart", onGestureStart as EventListener);
-      window.removeEventListener("gesturechange", onGestureChange as EventListener);
-      window.removeEventListener("gestureend", onGestureEnd as EventListener);
+      window.removeEventListener("gesturestart", onGestureStart as EventListener, true);
+      window.removeEventListener("gesturechange", onGestureChange as EventListener, true);
+      window.removeEventListener("gestureend", onGestureEnd as EventListener, true);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       subscriptions.forEach((unsubscribe) => unsubscribe());
@@ -1093,6 +1246,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       renderer?.dispose();
       delete document.documentElement.dataset.artActive;
       delete document.documentElement.dataset.artDragging;
+      delete document.documentElement.dataset.artResizing;
       stage.remove();
     },
   };

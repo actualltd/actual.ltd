@@ -33,6 +33,7 @@ let snap: LenisSnap | null = null;
 let scrollFrame = 0;
 let activeSceneIndex = -1;
 let actualView = false;
+let artworkInteracting = false;
 
 function clampSceneIndex(index: number): number {
   return Math.max(0, Math.min(scrollScenes.length - 1, index));
@@ -99,6 +100,7 @@ function initialiseScroller(): void {
       easing,
     });
     snap.addElements(scrollScenes, { align: "start" });
+    if (artworkInteracting) lenis.stop();
   }
 
   if (Math.abs(window.scrollY - preservedScroll) > 1) window.scrollTo(0, preservedScroll);
@@ -153,6 +155,13 @@ function updateViewControl(): void {
   visual?.setActualView(actualView);
 }
 
+function updateArtworkInteractionState(active: boolean): void {
+  artworkInteracting = active;
+  if (!lenis) return;
+  if (active || document.hidden) lenis.stop();
+  else lenis.start();
+}
+
 async function initialiseVisual(): Promise<void> {
   try {
     const { createVisual } = await import("./visual");
@@ -160,6 +169,7 @@ async function initialiseVisual(): Promise<void> {
       motionEnabled,
       reducedMotion: reducedMotionQuery.matches,
       onStateChange: updateRecord,
+      onInteractionStateChange: updateArtworkInteractionState,
       onUnavailable: () => {
         visualLayer.classList.add("is-unavailable");
         visualLayer.classList.remove("is-ready");
@@ -234,7 +244,7 @@ coarsePointerQuery.addEventListener("change", initialiseScroller);
 
 document.addEventListener("visibilitychange", () => {
   if (!lenis) return;
-  if (document.hidden) lenis.stop();
+  if (document.hidden || artworkInteracting) lenis.stop();
   else lenis.start();
 });
 
