@@ -1,3 +1,41 @@
+import {
+  Color,
+  GLSL3,
+  Group,
+  LinearFilter,
+  Mesh,
+  MeshBasicMaterial,
+  MultiplyBlending,
+  NormalBlending,
+  OrthographicCamera,
+  PlaneGeometry,
+  RawShaderMaterial,
+  RingGeometry,
+  Scene,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
+  Vector2,
+  Vector4,
+  WebGLRenderer,
+  type Material,
+} from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import {
+  DitheringTypes,
+  imageDitheringFragmentShader,
+} from "@paper-design/shaders";
+import {
+  animate,
+  motionValue,
+  springValue,
+  type AnimationPlaybackControls,
+  type MotionValue,
+} from "motion";
+
 export interface VisualState {
   index: number;
   code: string;
@@ -63,676 +101,539 @@ interface VisualOptions {
   onAvailable?: () => void;
 }
 
-interface Crop {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+type LayerRole = "main" | "figure" | "object";
 
-type LayerShape = "rect" | "ellipse" | "slant-left" | "slant-right";
-
-interface Layer {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  crop: Crop;
-  depth: number;
+interface LayerSource {
+  role: LayerRole;
+  imageUrl: string;
+  aspect: number;
   opacity: number;
-  paperWash?: number;
-  shape?: LayerShape;
 }
 
-type DitherTechnique = "halftone" | "diffusion";
-
-interface MixedMediaSource {
-  figureUrl: string;
-  figureTechnique: DitherTechnique;
-  figureInvert: boolean;
-  objectUrl: string;
-  objectTechnique: DitherTechnique;
-  objectInvert: boolean;
+interface LayerLayout {
+  x: number;
+  y: number;
+  width: number;
 }
 
-interface PreparedMedia {
-  figure: HTMLCanvasElement;
-  object: HTMLCanvasElement;
+interface SceneMedia {
+  ditherType: number;
+  pixelSize: number;
+  colorSteps: number;
+  desktop: Record<LayerRole, LayerLayout>;
+  mobile: Record<LayerRole, LayerLayout>;
+  layers: readonly LayerSource[];
 }
 
-const MIXED_MEDIA_SOURCES: readonly MixedMediaSource[] = [
+interface LayerMesh {
+  role: LayerRole;
+  mesh: Mesh<PlaneGeometry, MeshBasicMaterial>;
+  material: MeshBasicMaterial;
+  aspect: number;
+  baseOpacity: number;
+  baseX: number;
+  baseY: number;
+  depth: number;
+}
+
+interface SceneRecord {
+  group: Group;
+  layers: LayerMesh[];
+  materials: Array<{ material: Material; baseOpacity: number }>;
+  effects: Array<Mesh<RingGeometry, MeshBasicMaterial>>;
+  opacity: MotionValue<number>;
+  opacityAnimation?: AnimationPlaybackControls;
+}
+
+const INK = new Vector4(17 / 255, 16 / 255, 14 / 255, 1);
+const PAPER = new Vector4(231 / 255, 224 / 255, 212 / 255, 1);
+const PURE_WHITE = new Color(0xffffff);
+const MAX_DPR = 1.5;
+
+const SCENE_MEDIA: readonly SceneMedia[] = [
   {
-    figureUrl: "/art/sharaku.jpg",
-    figureTechnique: "halftone",
-    figureInvert: false,
-    objectUrl: "/art/conch-trumpet.jpg",
-    objectTechnique: "diffusion",
-    objectInvert: false,
+    ditherType: DitheringTypes["8x8"],
+    pixelSize: 2.15,
+    colorSteps: 1,
+    desktop: {
+      main: { x: 0, y: 0.28, width: 0.44 },
+      figure: { x: -0.25, y: 0.20, width: 0.15 },
+      object: { x: 0.25, y: 0.02, width: 0.14 },
+    },
+    mobile: {
+      main: { x: 0, y: 0.34, width: 0.76 },
+      figure: { x: -0.27, y: 0.24, width: 0.27 },
+      object: { x: 0.27, y: 0.08, width: 0.27 },
+    },
+    layers: [
+      { role: "main", imageUrl: "/art/great-wave.jpg", aspect: 600 / 405, opacity: 0.94 },
+      { role: "figure", imageUrl: "/art/sharaku.jpg", aspect: 417 / 624, opacity: 0.82 },
+      { role: "object", imageUrl: "/art/conch-trumpet.jpg", aspect: 599 / 494, opacity: 0.78 },
+    ],
   },
   {
-    figureUrl: "/art/spanish-dancer.jpg",
-    figureTechnique: "halftone",
-    figureInvert: false,
-    objectUrl: "/art/chronometer-dial.jpg",
-    objectTechnique: "diffusion",
-    objectInvert: false,
+    ditherType: DitheringTypes["4x4"],
+    pixelSize: 2.35,
+    colorSteps: 2,
+    desktop: {
+      main: { x: 0, y: 0.28, width: 0.36 },
+      figure: { x: 0.25, y: 0.21, width: 0.14 },
+      object: { x: -0.25, y: 0.02, width: 0.14 },
+    },
+    mobile: {
+      main: { x: 0, y: 0.34, width: 0.63 },
+      figure: { x: 0.27, y: 0.22, width: 0.24 },
+      object: { x: -0.27, y: 0.06, width: 0.27 },
+    },
+    layers: [
+      { role: "main", imageUrl: "/art/horses-running.jpg", aspect: 1024 / 822, opacity: 1 },
+      { role: "figure", imageUrl: "/art/spanish-dancer.jpg", aspect: 444 / 624, opacity: 0.80 },
+      { role: "object", imageUrl: "/art/chronometer-dial.jpg", aspect: 599 / 575, opacity: 0.80 },
+    ],
   },
   {
-    figureUrl: "/art/thinker.jpg",
-    figureTechnique: "halftone",
-    figureInvert: false,
-    objectUrl: "/art/lunar-module.jpg",
-    objectTechnique: "diffusion",
-    objectInvert: true,
+    ditherType: DitheringTypes.random,
+    pixelSize: 1.85,
+    colorSteps: 2,
+    desktop: {
+      main: { x: 0, y: 0.28, width: 0.42 },
+      figure: { x: -0.25, y: 0.19, width: 0.15 },
+      object: { x: 0.25, y: 0.01, width: 0.14 },
+    },
+    mobile: {
+      main: { x: 0, y: 0.34, width: 0.70 },
+      figure: { x: -0.27, y: 0.22, width: 0.26 },
+      object: { x: 0.27, y: 0.07, width: 0.27 },
+    },
+    layers: [
+      { role: "main", imageUrl: "/art/earthrise.jpg", aspect: 1920 / 1200, opacity: 0.60 },
+      { role: "figure", imageUrl: "/art/thinker.jpg", aspect: 490 / 624, opacity: 0.62 },
+      { role: "object", imageUrl: "/art/lunar-module.jpg", aspect: 3011 / 2999, opacity: 0.62 },
+    ],
   },
 ] as const;
 
-const BAYER_8 = [
-  0, 32, 8, 40, 2, 34, 10, 42,
-  48, 16, 56, 24, 50, 18, 58, 26,
-  12, 44, 4, 36, 14, 46, 6, 38,
-  60, 28, 52, 20, 62, 30, 54, 22,
-  3, 35, 11, 43, 1, 33, 9, 41,
-  51, 19, 59, 27, 49, 17, 57, 25,
-  15, 47, 7, 39, 13, 45, 5, 37,
-  63, 31, 55, 23, 61, 29, 53, 21,
-] as const;
+const FULLSCREEN_VERTEX_SHADER = `precision mediump float;
+in vec3 position;
+void main() {
+  gl_Position = vec4(position, 1.0);
+}`;
 
-const INK = [17, 16, 14] as const;
-const PAPER = [231, 224, 212] as const;
-const FULL_IMAGE: Crop = { x: 0, y: 0, width: 1, height: 1 };
-const FRAME_INTERVAL = 1000 / 24;
-const SCENE_TRANSITION_MS = 960;
+const PAPER_POSTPROCESS_FRAGMENT_SHADER = imageDitheringFragmentShader
+  .replace(/^#version 300 es\s*/, "")
+  .replace("imageUV.y = 1. - imageUV.y;", "");
 
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
+function clampIndex(index: number): number {
+  return Math.max(0, Math.min(SCENE_MEDIA.length - 1, index));
 }
 
-function easeInOut(value: number): number {
-  return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Unable to load ${url}`));
-    image.src = url;
+function setRecordOpacity(record: SceneRecord, opacity: number): void {
+  record.materials.forEach(({ material, baseOpacity }) => {
+    material.opacity = baseOpacity * opacity;
   });
-}
-
-function prepareDitheredAsset(
-  image: HTMLImageElement,
-  technique: DitherTechnique,
-  invert: boolean,
-): HTMLCanvasElement {
-  const maximumWidth = 520;
-  const scale = Math.min(1, maximumWidth / image.naturalWidth);
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const source = document.createElement("canvas");
-  const output = document.createElement("canvas");
-  source.width = width;
-  source.height = height;
-  output.width = width;
-  output.height = height;
-  const sourceContext = source.getContext("2d", { willReadFrequently: true });
-  const outputContext = output.getContext("2d");
-  if (!sourceContext || !outputContext) return output;
-
-  sourceContext.filter = "grayscale(1) contrast(1.18)";
-  sourceContext.drawImage(image, 0, 0, width, height);
-  const sourcePixels = sourceContext.getImageData(0, 0, width, height).data;
-
-  if (technique === "halftone") {
-    const cell = 8;
-    outputContext.fillStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
-    for (let y = 0; y < height; y += cell) {
-      for (let x = 0; x < width; x += cell) {
-        const sampleX = Math.min(width - 1, x + Math.floor(cell / 2));
-        const sampleY = Math.min(height - 1, y + Math.floor(cell / 2));
-        const offset = (sampleY * width + sampleX) * 4;
-        const red = sourcePixels[offset] ?? 255;
-        const green = sourcePixels[offset + 1] ?? 255;
-        const blue = sourcePixels[offset + 2] ?? 255;
-        const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
-        const density = invert
-          ? clamp((luminance - 0.6) * 1.85, 0, 1)
-          : clamp((0.57 - luminance) * 1.7, 0, 1);
-        const radius = Math.sqrt(density) * cell * 0.5;
-        if (radius < 0.4) continue;
-        outputContext.beginPath();
-        outputContext.arc(x + cell / 2, y + cell / 2, radius, 0, Math.PI * 2);
-        outputContext.fill();
-      }
-    }
-    return output;
-  }
-
-  const tones = new Float32Array(width * height);
-  for (let pixel = 0; pixel < tones.length; pixel += 1) {
-    const offset = pixel * 4;
-    const red = sourcePixels[offset] ?? 255;
-    const green = sourcePixels[offset + 1] ?? 255;
-    const blue = sourcePixels[offset + 2] ?? 255;
-    const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
-    const tone = invert ? 1 - luminance : luminance;
-    tones[pixel] = clamp((tone - 0.5) * 1.08 + 0.5, 0, 1);
-  }
-
-  const outputPixels = outputContext.createImageData(width, height);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = y * width + x;
-      const oldTone = tones[index] ?? 1;
-      const newTone = oldTone < 0.5 ? 0 : 1;
-      const error = oldTone - newTone;
-      if (newTone === 0) {
-        const offset = index * 4;
-        outputPixels.data[offset] = INK[0];
-        outputPixels.data[offset + 1] = INK[1];
-        outputPixels.data[offset + 2] = INK[2];
-        outputPixels.data[offset + 3] = 255;
-      }
-      if (x + 1 < width) tones[index + 1] = (tones[index + 1] ?? 0) + error * 7 / 16;
-      if (y + 1 < height) {
-        if (x > 0) tones[index + width - 1] = (tones[index + width - 1] ?? 0) + error * 3 / 16;
-        tones[index + width] = (tones[index + width] ?? 0) + error * 5 / 16;
-        if (x + 1 < width) tones[index + width + 1] = (tones[index + width + 1] ?? 0) + error / 16;
-      }
-    }
-  }
-  outputContext.putImageData(outputPixels, 0, 0);
-  return output;
+  record.group.visible = opacity > 0.002;
 }
 
 export function createVisual(container: HTMLElement, options: VisualOptions): VisualController {
-  const canvas = document.createElement("canvas");
-  canvas.setAttribute("aria-hidden", "true");
-  canvas.setAttribute("role", "presentation");
-  container.append(canvas);
+  const stage = document.createElement("div");
+  stage.className = "art-engine";
+  stage.dataset.renderer = "three-paper-motion";
+  stage.dataset.depthPlanes = "4";
+  stage.dataset.ditherProvider = "paper-shaders";
+  stage.dataset.motionProvider = "motion";
+  stage.dataset.scene = "0";
+  stage.setAttribute("aria-hidden", "true");
+  container.append(stage);
 
-  const context = canvas.getContext("2d", { alpha: false, desynchronized: true, willReadFrequently: true });
-  const composition = document.createElement("canvas");
-  const compositionContext = composition.getContext("2d", { alpha: false, willReadFrequently: true });
-
-  if (!context || !compositionContext) {
-    canvas.remove();
-    container.classList.add("is-unavailable");
-    options.onUnavailable();
-    return {
-      setMotionEnabled: () => undefined,
-      setScene: () => undefined,
-      destroy: () => undefined,
-    };
-  }
-
-  const images: HTMLImageElement[] = [];
-  const preparedMedia: PreparedMedia[] = [];
+  let renderer: WebGLRenderer | null = null;
+  let composer: EffectComposer | null = null;
+  let camera: OrthographicCamera | null = null;
+  let ditherMaterial: RawShaderMaterial | null = null;
   let motionEnabled = options.motionEnabled;
+  let desiredSceneIndex = 0;
+  let activeSceneIndex = -1;
   let destroyed = false;
-  let loaded = false;
-  let frameRequest = 0;
-  let lastFrameAt = 0;
-  let activeStateIndex = 0;
-  let previousStateIndex = 0;
-  let transitionStartedAt = -Infinity;
-  let elapsed = 0;
-  let lastTime: number | undefined;
+  let ready = false;
+  let frame = 0;
+  let lastTime = 0;
+  let contextLost = false;
+  const records: SceneRecord[] = [];
+  const textures: Texture[] = [];
 
-  const hasTransition = (time: number): boolean => time - transitionStartedAt < SCENE_TRANSITION_MS;
+  const pointerTargetX = motionValue(0);
+  const pointerTargetY = motionValue(0);
+  const pointerX = springValue(pointerTargetX, { stiffness: 95, damping: 22, mass: 0.8 });
+  const pointerY = springValue(pointerTargetY, { stiffness: 95, damping: 22, mass: 0.8 });
+  let resolvedPointerX = 0;
+  let resolvedPointerY = 0;
 
-  const clipLayer = (ctx: CanvasRenderingContext2D, layer: Layer): void => {
-    const { x, y, width, height } = layer;
-    ctx.beginPath();
-    if (layer.shape === "ellipse") {
-      ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
-    } else if (layer.shape === "slant-left") {
-      ctx.moveTo(x + width * 0.08, y);
-      ctx.lineTo(x + width, y + height * 0.03);
-      ctx.lineTo(x + width * 0.9, y + height);
-      ctx.lineTo(x, y + height * 0.92);
-      ctx.closePath();
-    } else if (layer.shape === "slant-right") {
-      ctx.moveTo(x, y + height * 0.05);
-      ctx.lineTo(x + width * 0.92, y);
-      ctx.lineTo(x + width, y + height * 0.9);
-      ctx.lineTo(x + width * 0.08, y + height);
-      ctx.closePath();
-    } else {
-      ctx.rect(x, y, width, height);
-    }
-    ctx.clip();
+  const stopPointerX = pointerX.on("change", (value) => {
+    resolvedPointerX = value;
+  });
+  const stopPointerY = pointerY.on("change", (value) => {
+    resolvedPointerY = value;
+  });
+
+  const showFallback = (): void => {
+    if (destroyed) return;
+    ready = false;
+    container.classList.add("is-unavailable");
+    container.classList.remove("is-ready");
+    options.onUnavailable();
   };
 
-  const drawLayer = (
-    image: HTMLImageElement,
-    layer: Layer,
-    sceneAlpha: number,
-    time: number,
-    phase: number,
-  ): void => {
-    const driftX = motionEnabled ? Math.sin(time * 0.00013 + phase) * layer.depth * composition.width * 0.0025 : 0;
-    const driftY = motionEnabled ? Math.cos(time * 0.00011 + phase * 1.4) * layer.depth * composition.height * 0.002 : 0;
-    const x = layer.x + driftX;
-    const y = layer.y + driftY;
-    const sourceX = layer.crop.x * image.naturalWidth;
-    const sourceY = layer.crop.y * image.naturalHeight;
-    const sourceWidth = layer.crop.width * image.naturalWidth;
-    const sourceHeight = layer.crop.height * image.naturalHeight;
-
-    compositionContext.save();
-    compositionContext.globalAlpha = layer.opacity * sceneAlpha;
-    compositionContext.filter = "grayscale(1) contrast(1.18)";
-    clipLayer(compositionContext, { ...layer, x, y });
-    compositionContext.drawImage(
-      image,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      x,
-      y,
-      layer.width,
-      layer.height,
-    );
-    compositionContext.restore();
+  const showRenderer = (): void => {
+    if (destroyed) return;
+    ready = true;
+    container.classList.remove("is-unavailable");
+    container.classList.add("is-ready");
+    options.onAvailable?.();
   };
 
-  const drawWave = (alpha: number, time: number): void => {
-    const image = images[0];
-    const width = Math.min(composition.width * 0.72, composition.height * 1.25);
-    const height = width * 0.675;
-    const x = composition.width * 0.5 - width * 0.5;
-    const y = composition.height * 0.45 - height * 0.5;
-
-    const layers: Layer[] = [
-      { x, y, width, height, crop: FULL_IMAGE, depth: 0.18, opacity: 0.92, shape: "rect" },
-      { x: x + width * 0.54, y: y - height * 0.02, width: width * 0.4, height: height * 0.5, crop: { x: 0.48, y: 0.08, width: 0.45, height: 0.56 }, depth: 0.46, opacity: 0.18, shape: "rect" },
-    ];
-
-    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.9));
+  const updateDither = (sceneIndex: number): void => {
+    if (!ditherMaterial) return;
+    const media = SCENE_MEDIA[sceneIndex];
+    ditherMaterial.uniforms.u_type.value = media.ditherType;
+    ditherMaterial.uniforms.u_pxSize.value = media.pixelSize;
+    ditherMaterial.uniforms.u_colorSteps.value = media.colorSteps;
   };
 
-  const horseCrop = (frame: number): Crop => {
-    const column = frame % 5;
-    const row = Math.floor(frame / 5) % 4;
-    return {
-      x: 0.247 + column * 0.108,
-      y: 0.292 + row * 0.118,
-      width: 0.099,
-      height: 0.101,
-    };
-  };
+  const applyLayout = (): void => {
+    if (!camera || !renderer) return;
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+    const aspect = width / height;
+    const viewportWidth = aspect * 2;
+    const compact = width < 700 || aspect < 0.82;
 
-  const drawHorses = (alpha: number, time: number): void => {
-    const image = images[1];
-    const width = Math.min(composition.width * 0.64, composition.height * 1.08);
-    const height = width * 0.79;
-    const x = composition.width * 0.5 - width * 0.5;
-    const y = composition.height * 0.42 - height * 0.5;
-    const frame = motionEnabled ? Math.floor(elapsed / 360) % 20 : 7;
+    camera.left = -aspect;
+    camera.right = aspect;
+    camera.top = 1;
+    camera.bottom = -1;
+    camera.updateProjectionMatrix();
 
-    const layers: Layer[] = [
-      { x, y, width, height, crop: FULL_IMAGE, depth: 0.16, opacity: 0.9, shape: "rect" },
-      { x: x + width * 0.37, y: y - height * 0.12, width: width * 0.26, height: height * 0.25, crop: horseCrop(frame), depth: 0.5, opacity: 0.25, shape: "rect" },
-    ];
+    records.forEach((record, recordIndex) => {
+      const layout = compact ? SCENE_MEDIA[recordIndex].mobile : SCENE_MEDIA[recordIndex].desktop;
+      record.layers.forEach((layer) => {
+        const spec = layout[layer.role];
+        let meshWidth = viewportWidth * spec.width;
+        let meshHeight = meshWidth / layer.aspect;
+        const maxHeight = layer.role === "main" ? 1.2 : 0.84;
+        if (meshHeight > maxHeight) {
+          const scale = maxHeight / meshHeight;
+          meshWidth *= scale;
+          meshHeight *= scale;
+        }
+        layer.baseX = viewportWidth * spec.x;
+        layer.baseY = spec.y;
+        layer.mesh.scale.set(meshWidth, meshHeight, 1);
+        layer.mesh.position.set(layer.baseX, layer.baseY, layer.depth);
+      });
+    });
 
-    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 1.4));
-  };
-
-  const drawEarthrise = (alpha: number, time: number): void => {
-    const image = images[2];
-    const width = Math.min(composition.width * 0.72, composition.height * 1.18);
-    const height = width * 0.625;
-    const x = composition.width * 0.5 - width * 0.5;
-    const y = composition.height * 0.45 - height * 0.5;
-
-    const layers: Layer[] = [
-      { x, y, width, height, crop: FULL_IMAGE, depth: 0.14, opacity: 0.9, shape: "rect" },
-      { x: x - width * 0.03, y: y + height * 0.67, width: width * 1.03, height: height * 0.23, crop: { x: 0, y: 0.68, width: 1, height: 0.25 }, depth: 0.42, opacity: 0.2, shape: "rect" },
-    ];
-
-    layers.forEach((layer, index) => drawLayer(image, layer, alpha, time, index * 2.1));
-  };
-
-  const drawScene = (sceneIndex: number, alpha: number, time: number): void => {
-    if (sceneIndex === 0) drawWave(alpha, time);
-    else if (sceneIndex === 1) drawHorses(alpha, time);
-    else drawEarthrise(alpha, time);
-  };
-
-  const applyDither = (): void => {
-    const frame = compositionContext.getImageData(0, 0, composition.width, composition.height);
-    const pixels = frame.data;
-    const width = composition.width;
-
-    for (let offset = 0, pixel = 0; offset < pixels.length; offset += 4, pixel += 1) {
-      const red = pixels[offset] ?? 255;
-      const green = pixels[offset + 1] ?? 255;
-      const blue = pixels[offset + 2] ?? 255;
-      const x = pixel % width;
-      const y = Math.floor(pixel / width);
-      const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
-      const tone = clamp((luminance - 0.055) / 0.9, 0, 1);
-      const threshold = ((BAYER_8[(x & 7) + (y & 7) * 8] ?? 0) + 0.5) / 64;
-      const usePaper = luminance > 0.985 || tone >= threshold;
-      const color = usePaper ? PAPER : INK;
-      pixels[offset] = color[0];
-      pixels[offset + 1] = color[1];
-      pixels[offset + 2] = color[2];
-      pixels[offset + 3] = 255;
-    }
-
-    context.putImageData(frame, 0, 0);
-  };
-
-  const drawPreparedLayer = (
-    media: HTMLCanvasElement,
-    layer: Layer,
-    sceneAlpha: number,
-    time: number,
-    phase: number,
-  ): void => {
-    const driftX = motionEnabled ? Math.sin(time * 0.00016 + phase) * layer.depth * canvas.width * 0.003 : 0;
-    const driftY = motionEnabled ? Math.cos(time * 0.00012 + phase * 1.3) * layer.depth * canvas.height * 0.0024 : 0;
-    const x = layer.x + driftX;
-    const y = layer.y + driftY;
-    const sourceX = layer.crop.x * media.width;
-    const sourceY = layer.crop.y * media.height;
-    const sourceWidth = layer.crop.width * media.width;
-    const sourceHeight = layer.crop.height * media.height;
-
-    context.save();
-    clipLayer(context, { ...layer, x, y });
-    context.globalAlpha = sceneAlpha * (layer.paperWash ?? 0.14);
-    context.fillStyle = `rgb(${PAPER[0]} ${PAPER[1]} ${PAPER[2]})`;
-    context.fillRect(x, y, layer.width, layer.height);
-    context.globalAlpha = sceneAlpha * layer.opacity;
-    context.drawImage(
-      media,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      x,
-      y,
-      layer.width,
-      layer.height,
-    );
-    context.restore();
-  };
-
-  const drawEffectLayer = (sceneIndex: number, alpha: number, time: number): void => {
-    const width = canvas.width;
-    const height = canvas.height;
-    const compact = height > width * 1.35;
-    const driftX = motionEnabled ? Math.sin(time * 0.00018) * width * 0.002 : 0;
-    const driftY = motionEnabled ? Math.cos(time * 0.00015) * height * 0.0015 : 0;
-
-    context.save();
-    context.translate(driftX, driftY);
-    context.globalAlpha = alpha * 0.16;
-    context.strokeStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
-    context.fillStyle = `rgb(${INK[0]} ${INK[1]} ${INK[2]})`;
-    context.lineWidth = 0.7;
-    context.font = `${Math.max(6, width * 0.009)}px "Geist Mono Variable", monospace`;
-
-    if (sceneIndex === 0) {
-      const centerX = width * 0.69;
-      const centerY = height * (compact ? 0.39 : 0.34);
-      for (let ring = 0; ring < 5; ring += 1) {
-        context.beginPath();
-        context.ellipse(
-          centerX,
-          centerY,
-          width * (0.09 + ring * 0.025),
-          (compact ? width : height) * (0.055 + ring * 0.016),
-          -0.42,
-          Math.PI * 0.16,
-          Math.PI * 1.82,
-        );
-        context.stroke();
-      }
-      context.globalAlpha = alpha * 0.12;
-      context.fillText(".  :  *  %  ~  ~", width * 0.12, height * (compact ? 0.47 : 0.22));
-      context.fillText("~  ~  %  *  :  .", width * 0.58, height * (compact ? 0.31 : 0.57));
-    } else if (sceneIndex === 1) {
-      context.setLineDash([2, 5]);
-      const top = height * (compact ? 0.29 : 0.16);
-      const bottom = height * (compact ? 0.54 : 0.63);
-      for (let line = 0; line < 7; line += 1) {
-        const x = width * (0.18 + line * 0.105);
-        context.beginPath();
-        context.moveTo(x, top);
-        context.lineTo(x, bottom);
-        context.stroke();
-        context.fillText(String(line + 1).padStart(2, "0"), x - 4, top - 6);
-      }
-      context.setLineDash([]);
-      context.globalAlpha = alpha * 0.1;
-      for (let line = 0; line < 4; line += 1) {
-        const y = top + (bottom - top) * (line / 3);
-        context.fillRect(width * 0.13, y, width * 0.74, 1);
-      }
-    } else {
-      const centerX = width * 0.58;
-      const centerY = height * (compact ? 0.39 : 0.34);
-      context.setLineDash([4, 5]);
-      for (let orbit = 0; orbit < 3; orbit += 1) {
-        context.beginPath();
-        context.ellipse(
-          centerX,
-          centerY,
-          width * (0.15 + orbit * 0.07),
-          (compact ? width : height) * (0.07 + orbit * 0.045),
-          -0.2 + orbit * 0.16,
-          0,
-          Math.PI * 2,
-        );
-        context.stroke();
-      }
-      context.setLineDash([]);
-      context.beginPath();
-      context.moveTo(centerX - width * 0.045, centerY);
-      context.lineTo(centerX + width * 0.045, centerY);
-      context.moveTo(centerX, centerY - width * 0.045);
-      context.lineTo(centerX, centerY + width * 0.045);
-      context.stroke();
-      context.globalAlpha = alpha * 0.12;
-      context.fillText("LAT 00.0 / LON 00.0", width * 0.13, height * (compact ? 0.53 : 0.58));
-    }
-
-    context.restore();
-  };
-
-  const drawMixedMedia = (sceneIndex: number, alpha: number, time: number): void => {
-    const media = preparedMedia[sceneIndex];
-    if (!media || alpha <= 0.001) return;
-    const width = canvas.width;
-    const height = canvas.height;
-    const compact = height > width * 1.35;
-    let figure: Layer;
-    let object: Layer;
-
-    if (compact) {
-      if (sceneIndex === 0) {
-        figure = { x: width * 0.1, y: height * 0.31, width: width * 0.21, height: width * 0.5, crop: FULL_IMAGE, depth: 0.72, opacity: 0.64, paperWash: 0.24, shape: "rect" };
-        object = { x: width * 0.7, y: height * 0.34, width: width * 0.15, height: width * 0.23, crop: FULL_IMAGE, depth: 0.92, opacity: 0.58, paperWash: 0.16, shape: "ellipse" };
-      } else if (sceneIndex === 1) {
-        figure = { x: width * 0.72, y: height * 0.3, width: width * 0.17, height: width * 0.48, crop: FULL_IMAGE, depth: 0.74, opacity: 0.62, paperWash: 0.24, shape: "rect" };
-        object = { x: width * 0.12, y: height * 0.38, width: width * 0.16, height: width * 0.22, crop: FULL_IMAGE, depth: 0.94, opacity: 0.54, paperWash: 0.16, shape: "ellipse" };
-      } else {
-        figure = { x: width * 0.1, y: height * 0.34, width: width * 0.24, height: width * 0.48, crop: FULL_IMAGE, depth: 0.76, opacity: 0.66, paperWash: 0.34, shape: "rect" };
-        object = { x: width * 0.7, y: height * 0.36, width: width * 0.17, height: width * 0.23, crop: FULL_IMAGE, depth: 0.96, opacity: 0.6, paperWash: 0.18, shape: "rect" };
-      }
-    } else if (sceneIndex === 0) {
-      figure = { x: width * 0.12, y: height * 0.14, width: width * 0.17, height: height * 0.53, crop: FULL_IMAGE, depth: 0.72, opacity: 0.64, paperWash: 0.24, shape: "rect" };
-      object = { x: width * 0.73, y: height * 0.31, width: width * 0.13, height: height * 0.24, crop: FULL_IMAGE, depth: 0.92, opacity: 0.58, paperWash: 0.16, shape: "ellipse" };
-    } else if (sceneIndex === 1) {
-      figure = { x: width * 0.71, y: height * 0.16, width: width * 0.15, height: height * 0.48, crop: FULL_IMAGE, depth: 0.74, opacity: 0.62, paperWash: 0.24, shape: "rect" };
-      object = { x: width * 0.16, y: height * 0.34, width: width * 0.13, height: height * 0.2, crop: FULL_IMAGE, depth: 0.94, opacity: 0.54, paperWash: 0.16, shape: "ellipse" };
-    } else {
-      figure = { x: width * 0.14, y: height * 0.24, width: width * 0.18, height: height * 0.4, crop: FULL_IMAGE, depth: 0.76, opacity: 0.66, paperWash: 0.34, shape: "rect" };
-      object = { x: width * 0.72, y: height * 0.31, width: width * 0.14, height: height * 0.22, crop: FULL_IMAGE, depth: 0.96, opacity: 0.6, paperWash: 0.18, shape: "rect" };
-    }
-
-    drawEffectLayer(sceneIndex, alpha, time);
-    drawPreparedLayer(media.figure, figure, alpha, time, sceneIndex * 1.7 + 0.8);
-    drawPreparedLayer(media.object, object, alpha, time, sceneIndex * 1.7 + 2.4);
+    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(width, height, false);
+    composer?.setPixelRatio(dpr);
+    composer?.setSize(width, height);
+    ditherMaterial?.uniforms.u_resolution.value.set(width * dpr, height * dpr);
+    ditherMaterial!.uniforms.u_pixelRatio.value = dpr;
+    ditherMaterial!.uniforms.u_imageAspectRatio.value = aspect;
   };
 
   const render = (time: number): void => {
-    if (!loaded || destroyed) return;
-    compositionContext.save();
-    compositionContext.setTransform(1, 0, 0, 1, 0, 0);
-    compositionContext.filter = "none";
-    compositionContext.globalAlpha = 1;
-    compositionContext.fillStyle = "#ffffff";
-    compositionContext.fillRect(0, 0, composition.width, composition.height);
-
-    let previousAlpha = 0;
-    let activeAlpha = 1;
-    if (hasTransition(time)) {
-      const progress = easeInOut(clamp((time - transitionStartedAt) / SCENE_TRANSITION_MS, 0, 1));
-      previousAlpha = 1 - progress;
-      activeAlpha = progress;
-      drawScene(previousStateIndex, previousAlpha, time);
-      drawScene(activeStateIndex, activeAlpha, time);
-    } else {
-      drawScene(activeStateIndex, 1, time);
-    }
-
-    compositionContext.restore();
-    applyDither();
-    if (previousAlpha > 0.001) drawMixedMedia(previousStateIndex, previousAlpha, time);
-    drawMixedMedia(activeStateIndex, activeAlpha, time);
-  };
-
-  const scheduleFrame = (): void => {
-    if (frameRequest === 0 && loaded && !destroyed && !document.hidden) {
-      frameRequest = window.requestAnimationFrame(onFrame);
-    }
-  };
-
-  function onFrame(time: number): void {
-    frameRequest = 0;
-    if (destroyed || document.hidden || !loaded) {
-      lastTime = undefined;
-      return;
-    }
-
-    if (lastTime !== undefined && motionEnabled) elapsed += Math.min(time - lastTime, 50);
+    frame = 0;
+    if (!ready || destroyed || contextLost || document.hidden || !composer) return;
+    const elapsed = time * 0.001;
+    const delta = lastTime === 0 ? 0 : Math.min((time - lastTime) * 0.001, 0.05);
     lastTime = time;
 
-    const transitioning = hasTransition(time);
-    if (time - lastFrameAt >= FRAME_INTERVAL || transitioning) {
-      render(time);
-      lastFrameAt = time;
-    }
-
-    if (motionEnabled || transitioning) scheduleFrame();
-    else lastTime = undefined;
-  }
-
-  const goToScene = (nextIndex: number): void => {
-    const normalizedIndex = (nextIndex + VISUAL_STATES.length) % VISUAL_STATES.length;
-    if (destroyed || normalizedIndex === activeStateIndex) return;
-    const now = performance.now();
-    previousStateIndex = activeStateIndex;
-    activeStateIndex = normalizedIndex;
-    transitionStartedAt = now;
-    options.onStateChange(VISUAL_STATES[activeStateIndex]);
-    scheduleFrame();
-  };
-
-  const resize = (): void => {
-    if (destroyed) return;
-    const bounds = container.getBoundingClientRect();
-    const renderWidth = Math.round(clamp(bounds.width * 0.52, 340, 740));
-    const renderHeight = Math.max(1, Math.round(renderWidth * (bounds.height / Math.max(bounds.width, 1))));
-    if (canvas.width === renderWidth && canvas.height === renderHeight) return;
-    canvas.width = renderWidth;
-    canvas.height = renderHeight;
-    composition.width = renderWidth;
-    composition.height = renderHeight;
-    context.imageSmoothingEnabled = false;
-    compositionContext.imageSmoothingEnabled = true;
-    render(performance.now());
-  };
-
-  const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(container);
-
-  const handleVisibilityChange = (): void => {
-    lastTime = undefined;
-    if (document.hidden) {
-      if (frameRequest !== 0) window.cancelAnimationFrame(frameRequest);
-      frameRequest = 0;
-    } else {
-      render(performance.now());
-      scheduleFrame();
-    }
-  };
-
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  resize();
-  options.onStateChange(VISUAL_STATES[0]);
-
-  const imageUrls = [
-    ...VISUAL_STATES.map((state) => state.imageUrl),
-    ...MIXED_MEDIA_SOURCES.flatMap((source) => [source.figureUrl, source.objectUrl]),
-  ];
-
-  void Promise.all(imageUrls.map((url) => loadImage(url)))
-    .then((loadedImages) => {
-      if (destroyed) return;
-      images.push(...loadedImages.slice(0, VISUAL_STATES.length));
-      MIXED_MEDIA_SOURCES.forEach((source, index) => {
-        const figure = loadedImages[VISUAL_STATES.length + index * 2];
-        const object = loadedImages[VISUAL_STATES.length + index * 2 + 1];
-        if (!figure || !object) throw new Error(`Missing mixed-media assets for scene ${index + 1}`);
-        preparedMedia.push({
-          figure: prepareDitheredAsset(figure, source.figureTechnique, source.figureInvert),
-          object: prepareDitheredAsset(object, source.objectTechnique, source.objectInvert),
-        });
+    const active = records[activeSceneIndex];
+    if (active) {
+      active.layers.forEach((layer) => {
+        const amount = layer.role === "main" ? 0.018 : layer.role === "figure" ? 0.038 : 0.055;
+        layer.mesh.position.x = layer.baseX + resolvedPointerX * amount;
+        layer.mesh.position.y = layer.baseY - resolvedPointerY * amount * 0.62;
       });
-      loaded = true;
-      container.classList.remove("is-unavailable");
-      container.classList.add("is-ready");
-      options.onAvailable?.();
-      resize();
-      render(performance.now());
-      scheduleFrame();
-    })
-    .catch(() => {
-      if (destroyed) return;
-      container.classList.add("is-unavailable");
-      options.onUnavailable();
+      active.effects.forEach((effect, index) => {
+        effect.rotation.z = motionEnabled
+          ? elapsed * (0.018 + index * 0.004) * (activeSceneIndex === 1 ? -1 : 1)
+          : 0;
+      });
+    }
+
+    composer.render(delta);
+    if (motionEnabled) frame = window.requestAnimationFrame(render);
+  };
+
+  const requestRender = (): void => {
+    if (frame !== 0 || !ready || destroyed || contextLost || document.hidden) return;
+    frame = window.requestAnimationFrame(render);
+  };
+
+  const transitionTo = (sceneIndex: number, immediate = false): void => {
+    if (records.length === 0) return;
+    const nextIndex = clampIndex(sceneIndex);
+    const previousIndex = activeSceneIndex;
+    activeSceneIndex = nextIndex;
+    stage.dataset.scene = String(nextIndex);
+    updateDither(nextIndex);
+
+    records.forEach((record, index) => {
+      record.opacityAnimation?.stop();
+      const target = index === nextIndex ? 1 : 0;
+      if (target === 1) record.group.visible = true;
+      if (immediate || previousIndex < 0) {
+        record.opacity.set(target);
+      } else {
+        record.opacityAnimation = animate(record.opacity, target, {
+          duration: target === 1 ? 0.72 : 0.48,
+          ease: [0.16, 1, 0.3, 1],
+          onUpdate: requestRender,
+        });
+      }
     });
+    requestRender();
+  };
+
+  const addEffects = (record: SceneRecord, recordIndex: number): void => {
+    const counts = [4, 5, 6];
+    const count = counts[recordIndex];
+    for (let index = 0; index < count; index += 1) {
+      const radius = 0.34 + index * (recordIndex === 2 ? 0.10 : 0.12);
+      const geometry = new RingGeometry(radius, radius + 0.0065, 128);
+      const baseOpacity = recordIndex === 1 ? 0.11 : 0.14 - index * 0.012;
+      const material = new MeshBasicMaterial({
+        color: 0x11100e,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set(recordIndex === 1 ? -0.16 : 0.10, 0.28, -3 - index * 0.01);
+      mesh.scale.x = recordIndex === 0 ? 1.42 : recordIndex === 1 ? 0.82 : 1.12;
+      mesh.renderOrder = 0;
+      record.group.add(mesh);
+      record.effects.push(mesh);
+      record.materials.push({ material, baseOpacity });
+    }
+  };
+
+  const boot = async (): Promise<void> => {
+    try {
+      if (destroyed) return;
+      const nextRenderer = new WebGLRenderer({
+        antialias: false,
+        alpha: false,
+        powerPreference: "high-performance",
+      });
+      renderer = nextRenderer;
+      renderer.outputColorSpace = SRGBColorSpace;
+      renderer.setClearColor(PURE_WHITE, 1);
+      renderer.domElement.className = "art-canvas";
+      renderer.domElement.dataset.webgl = "three";
+      stage.append(renderer.domElement);
+
+      const scene = new Scene();
+      scene.background = PURE_WHITE;
+      camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 30);
+      camera.position.z = 10;
+
+      const loader = new TextureLoader();
+      const urls = SCENE_MEDIA.flatMap((record) => record.layers.map((layer) => layer.imageUrl));
+      const loadedTextures = await Promise.all(urls.map((url) => loader.loadAsync(url)));
+      if (destroyed) {
+        loadedTextures.forEach((texture) => texture.dispose());
+        return;
+      }
+      const textureByUrl = new Map<string, Texture>();
+      urls.forEach((url, index) => {
+        const texture = loadedTextures[index];
+        texture.colorSpace = SRGBColorSpace;
+        texture.minFilter = LinearFilter;
+        texture.magFilter = LinearFilter;
+        texture.generateMipmaps = false;
+        textures.push(texture);
+        textureByUrl.set(url, texture);
+      });
+
+      const planeGeometry = new PlaneGeometry(1, 1);
+      SCENE_MEDIA.forEach((media, recordIndex) => {
+        const group = new Group();
+        group.visible = false;
+        scene.add(group);
+        const opacity = motionValue(0);
+        const record: SceneRecord = {
+          group,
+          layers: [],
+          materials: [],
+          effects: [],
+          opacity,
+        };
+        opacity.on("change", (value) => {
+          setRecordOpacity(record, value);
+          requestRender();
+        });
+        addEffects(record, recordIndex);
+
+        media.layers.forEach((source, layerIndex) => {
+          const material = new MeshBasicMaterial({
+            map: textureByUrl.get(source.imageUrl),
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            blending: source.role === "main" ? NormalBlending : MultiplyBlending,
+            premultipliedAlpha: source.role !== "main",
+          });
+          const mesh = new Mesh(planeGeometry, material);
+          const depth = source.role === "main" ? -1 : source.role === "figure" ? 1 : 3;
+          mesh.position.z = depth;
+          mesh.renderOrder = layerIndex + 1;
+          group.add(mesh);
+          record.layers.push({
+            role: source.role,
+            mesh,
+            material,
+            aspect: source.aspect,
+            baseOpacity: source.opacity,
+            baseX: 0,
+            baseY: 0,
+            depth,
+          });
+          record.materials.push({ material, baseOpacity: source.opacity });
+        });
+        records.push(record);
+      });
+
+      ditherMaterial = new RawShaderMaterial({
+        vertexShader: FULLSCREEN_VERTEX_SHADER,
+        fragmentShader: PAPER_POSTPROCESS_FRAGMENT_SHADER,
+        glslVersion: GLSL3,
+        uniforms: {
+          u_resolution: { value: new Vector2(1, 1) },
+          u_pixelRatio: { value: 1 },
+          u_originX: { value: 0.5 },
+          u_originY: { value: 0.5 },
+          u_worldWidth: { value: 0 },
+          u_worldHeight: { value: 0 },
+          u_fit: { value: 2 },
+          u_scale: { value: 1 },
+          u_rotation: { value: 0 },
+          u_offsetX: { value: 0 },
+          u_offsetY: { value: 0 },
+          u_colorFront: { value: INK },
+          u_colorBack: { value: PAPER },
+          u_colorHighlight: { value: INK },
+          u_image: { value: null },
+          u_imageAspectRatio: { value: 1 },
+          u_type: { value: DitheringTypes["8x8"] },
+          u_pxSize: { value: 2.15 },
+          u_originalColors: { value: false },
+          u_inverted: { value: true },
+          u_colorSteps: { value: 1 },
+        },
+        depthTest: false,
+        depthWrite: false,
+      });
+
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      composer.addPass(new ShaderPass(ditherMaterial, "u_image"));
+      composer.addPass(new OutputPass());
+
+      renderer.domElement.addEventListener("webglcontextlost", (event) => {
+        event.preventDefault();
+        contextLost = true;
+        if (frame !== 0) window.cancelAnimationFrame(frame);
+        frame = 0;
+        showFallback();
+      });
+      renderer.domElement.addEventListener("webglcontextrestored", () => {
+        contextLost = false;
+        showRenderer();
+        applyLayout();
+        requestRender();
+      });
+
+      applyLayout();
+      transitionTo(desiredSceneIndex, true);
+      showRenderer();
+      requestRender();
+    } catch {
+      showFallback();
+    }
+  };
+
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!motionEnabled || event.pointerType === "touch") return;
+    pointerTargetX.set((event.clientX / Math.max(window.innerWidth, 1) - 0.5) * 2);
+    pointerTargetY.set((event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2);
+  };
+
+  const onPointerLeave = (): void => {
+    pointerTargetX.set(0);
+    pointerTargetY.set(0);
+  };
+
+  const onResize = (): void => {
+    applyLayout();
+    requestRender();
+  };
+
+  const onVisibilityChange = (): void => {
+    if (document.hidden) {
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      frame = 0;
+      lastTime = 0;
+    } else {
+      requestRender();
+    }
+  };
+
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  window.addEventListener("pointerleave", onPointerLeave);
+  window.addEventListener("resize", onResize, { passive: true });
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  options.onStateChange(VISUAL_STATES[0]);
+  void boot();
 
   return {
     setMotionEnabled(enabled: boolean): void {
-      if (destroyed || motionEnabled === enabled) return;
       motionEnabled = enabled;
-      lastTime = undefined;
-      render(performance.now());
-      scheduleFrame();
+      if (!enabled) {
+        pointerTargetX.set(0);
+        pointerTargetY.set(0);
+      }
+      requestRender();
     },
-
     setScene(index: number): void {
-      goToScene(index);
+      desiredSceneIndex = clampIndex(index);
+      options.onStateChange(VISUAL_STATES[desiredSceneIndex]);
+      transitionTo(desiredSceneIndex);
     },
-
     destroy(): void {
-      if (destroyed) return;
       destroyed = true;
-      if (frameRequest !== 0) window.cancelAnimationFrame(frameRequest);
-      resizeObserver.disconnect();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      container.classList.remove("is-ready");
-      canvas.remove();
+      ready = false;
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopPointerX();
+      stopPointerY();
+      records.forEach((record) => {
+        record.opacityAnimation?.stop();
+        record.materials.forEach(({ material }) => material.dispose());
+        record.effects.forEach((effect) => effect.geometry.dispose());
+        record.layers.forEach((layer) => layer.mesh.geometry.dispose());
+      });
+      textures.forEach((texture) => texture.dispose());
+      ditherMaterial?.dispose();
+      composer?.dispose();
+      renderer?.dispose();
+      stage.remove();
     },
   };
 }

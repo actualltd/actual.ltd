@@ -71,8 +71,7 @@ button {
 }
 
 .visual-layer,
-.visual-fallback,
-.visual-layer canvas {
+.visual-fallback {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -100,17 +99,28 @@ button {
   opacity: 1;
 }
 
-.visual-layer canvas {
+.art-engine {
+  position: absolute;
   z-index: 1;
-  display: block;
-  image-rendering: pixelated;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
-  pointer-events: none;
   transition: opacity 500ms ease;
 }
 
-.visual-layer.is-ready canvas {
+.visual-layer.is-ready .art-engine {
   opacity: 1;
+}
+
+.art-engine .art-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 
 .masthead,
