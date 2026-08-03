@@ -1,0 +1,322 @@
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+:root {
+  color-scheme: dark;
+  font-family: "Geist Variable", "Helvetica Neue", Arial, sans-serif;
+  color: #e7e0d4;
+  background: #11100e;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  --ink: #11100e;
+  --bone: #e7e0d4;
+  --edge: clamp(1rem, 2vw, 2rem);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+body {
+  min-width: 320px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  color: inherit;
+}
+
+.site-shell {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100svh;
+  min-height: 28rem;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.visual-layer,
+.visual-fallback,
+.visual-layer canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.visual-layer {
+  z-index: -2;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.visual-fallback {
+  z-index: -1;
+  opacity: 1;
+  background:
+    url("/poster.png") center / cover no-repeat,
+    radial-gradient(ellipse at 72% 30%, transparent 0 8%, rgb(231 224 212 / 0.7) 9% 18%, transparent 19% 26%),
+    radial-gradient(ellipse at 31% 68%, rgb(231 224 212 / 0.86) 0 10%, transparent 11% 20%, rgb(231 224 212 / 0.36) 21% 28%, transparent 29%),
+    repeating-radial-gradient(circle at 62% 54%, transparent 0 0.42rem, rgb(231 224 212 / 0.11) 0.48rem 0.58rem),
+    var(--ink);
+  filter: contrast(1.45);
+  transition: opacity 500ms ease;
+}
+
+.visual-layer.is-ready .visual-fallback {
+  opacity: 0;
+}
+
+.visual-layer.is-unavailable .visual-fallback {
+  opacity: 1;
+}
+
+.visual-layer canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.masthead,
+.footer {
+  position: absolute;
+  z-index: 2;
+  left: max(var(--edge), env(safe-area-inset-left));
+  right: max(var(--edge), env(safe-area-inset-right));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  font-size: clamp(0.7rem, 0.72vw, 0.78rem);
+  font-weight: 510;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  mix-blend-mode: difference;
+}
+
+.masthead {
+  top: max(var(--edge), env(safe-area-inset-top));
+}
+
+.footer {
+  bottom: max(var(--edge), env(safe-area-inset-bottom));
+  align-items: flex-end;
+}
+
+.record-meta {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.55rem 1rem;
+  align-items: baseline;
+}
+
+.density-ramp {
+  grid-column: 1 / -1;
+  opacity: 0.58;
+  letter-spacing: 0.18em;
+}
+
+.motion-control,
+.wordmark {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.motion-control {
+  position: relative;
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.motion-control:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.motion-control::after,
+.email::after {
+  position: absolute;
+  right: 0;
+  bottom: -0.4rem;
+  left: 0;
+  height: 1px;
+  content: "";
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 260ms var(--ease-out);
+}
+
+.motion-control:hover::after,
+.motion-control:focus-visible::after,
+.email:hover::after,
+.email:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.identity {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: min(94vw, 105rem);
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.wordmark {
+  display: block;
+  width: 100%;
+  color: var(--bone);
+  font-family: "Geist Variable", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(4.7rem, 18.1vw, 19rem);
+  font-weight: 680;
+  font-variation-settings: "wght" 680;
+  line-height: 0.72;
+  letter-spacing: -0.089em;
+  text-indent: -0.089em;
+  text-wrap: nowrap;
+  -webkit-text-stroke: 1px rgb(17 16 14 / 0.18);
+  text-shadow: 0 2px 18px rgb(17 16 14 / 0.2);
+  transition: letter-spacing 1000ms var(--ease-out), filter 400ms ease;
+}
+
+.wordmark:is(:hover, :focus-visible),
+.wordmark.is-revealed {
+  letter-spacing: -0.078em;
+}
+
+.wordmark:focus-visible,
+.motion-control:focus-visible,
+.email:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 0.45rem;
+}
+
+.company-description {
+  position: absolute;
+  top: calc(100% + clamp(1.5rem, 3.8vw, 3.5rem));
+  left: 50%;
+  margin: 0;
+  color: var(--bone);
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  padding: 0.55rem 0.72rem 0.5rem;
+  border: 1px solid var(--bone);
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+  font-size: clamp(0.72rem, 0.8vw, 0.86rem);
+  font-weight: 520;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 0.65rem);
+  transition: opacity 420ms ease, transform 850ms var(--ease-out);
+}
+
+.wordmark:is(:hover, :focus-visible, .is-revealed) + .company-description {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.edition {
+  opacity: 0.58;
+}
+
+.email {
+  position: relative;
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  color: inherit;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.email-arrow {
+  display: inline-block;
+  transition: transform 400ms var(--ease-out);
+}
+
+.email:hover .email-arrow,
+.email:focus-visible .email-arrow {
+  transform: translate(0.2rem, -0.2rem);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --edge: 1.25rem;
+  }
+
+  .site-shell {
+    min-height: 31rem;
+  }
+
+  .record-meta {
+    gap: 0.5rem 0.7rem;
+  }
+
+  .density-ramp {
+    max-width: 7rem;
+    overflow: hidden;
+  }
+
+  .identity {
+    width: calc(100vw - 1.5rem);
+  }
+
+  .wordmark {
+    font-size: 22.2vw;
+    line-height: 0.78;
+  }
+
+  .company-description {
+    top: calc(100% + 1.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .visual-layer {
+    display: none;
+  }
+
+  .wordmark,
+  .company-description {
+    color: CanvasText;
+  }
+}

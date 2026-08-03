@@ -1,0 +1,25 @@
+{
+  "name": "actual-index-001",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "prebuild": "node scripts/clean-dist.mjs",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.50.0",
+    "@types/three": "0.185.3",
+    "typescript": "7.0.2",
+    "vite": "8.2.0",
+    "wrangler": "4.118.0"
+  }
+}
