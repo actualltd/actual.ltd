@@ -1,6 +1,6 @@
-# ACTUAL / SIGNAL ARCHIVE
+# ACTUAL LTD.
 
-> ACTUAL presents Signal Archive: three studies in form, gesture, and afterimage.
+Official website of ACTUAL LTD.
 
 Canonical website: https://actual.ltd/
 
@@ -10,11 +10,11 @@ Legal entity: ACTUAL LTD.
 
 Registered office: 25 Chidlom, Ploenchit, Lumpini, Patumwan, Bangkok 10330, Thailand
 
-All nine artworks in this visual archive are from The Metropolitan Museum of Art Open Access collection and are marked Public Domain (CC0). Images are locally optimized for presentation; the collection pages below are the canonical records.
+The nine artworks are from The Metropolitan Museum of Art Open Access collection and are marked Public Domain (CC0). Images are optimized locally. The linked museum pages are the source records.
 
 ## Record 001 / FORM
 
-Matter takes a position.
+Painting / statue / vessel.
 
 Environment: Jacques Louis David, The Death of Socrates, 1787.
 The Metropolitan Museum of Art, Public Domain / Open Access.
@@ -30,7 +30,7 @@ https://www.metmuseum.org/art/collection/search/255154
 
 ## Record 002 / GESTURE
 
-The body invents the line.
+Painting / dancer / fan.
 
 Environment: Edgar Degas, The Dance Class, 1874.
 The Metropolitan Museum of Art, Public Domain / Open Access.
@@ -46,7 +46,7 @@ https://www.metmuseum.org/art/collection/search/209540
 
 ## Record 003 / AFTERIMAGE
 
-Light outlives the moment.
+Landscape / portrait / flowers.
 
 Environment: Vincent van Gogh, Wheat Field with Cypresses, 1889.
 The Metropolitan Museum of Art, Public Domain / Open Access.
