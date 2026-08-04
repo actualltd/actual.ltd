@@ -53,14 +53,7 @@ let activeSceneIndex = -1;
 let actualView = false;
 let artworkInteracting = false;
 let activeVisualState: VisualState | null = null;
-let wheelAccumulator = 0;
-let wheelGestureLocked = false;
-let wheelLockUntil = 0;
-let wheelResetTimer = 0;
 let artworkCloseTimer = 0;
-
-const STEP_SCROLL_DURATION = 780;
-const STEP_SCROLL_THRESHOLD = 18;
 
 function clampSceneIndex(index: number): number {
   return Math.max(0, Math.min(scrollScenes.length - 1, index));
@@ -92,59 +85,12 @@ function onNativeScroll(): void {
 function destroyScroller(): void {
   if (scrollFrame !== 0) window.cancelAnimationFrame(scrollFrame);
   scrollFrame = 0;
-  resetWheelGesture();
   window.removeEventListener("scroll", onNativeScroll);
   snap?.destroy();
   snap = null;
   lenis?.destroy();
   lenis = null;
   document.documentElement.classList.remove("is-lenis-enhanced");
-}
-
-function resetWheelGesture(): void {
-  wheelAccumulator = 0;
-  wheelGestureLocked = false;
-  wheelLockUntil = 0;
-  wheelResetTimer = 0;
-  delete document.documentElement.dataset.scrollLocked;
-}
-
-function scheduleWheelGestureReset(): void {
-  if (wheelResetTimer !== 0) window.clearTimeout(wheelResetTimer);
-  const remainingLock = Math.max(0, wheelLockUntil - performance.now());
-  wheelResetTimer = window.setTimeout(resetWheelGesture, Math.max(180, remainingLock));
-}
-
-function onStepWheel(event: WheelEvent): void {
-  if (!lenis || reducedMotionQuery.matches || coarsePointerQuery.matches) return;
-  if (document.hidden || artworkInteracting || companyDialog.open || creditsDialog.open || artworkDialog.open) return;
-  if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) * 0.72) return;
-  if (Math.abs(event.deltaY) < 0.5) return;
-
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  const direction = Math.sign(event.deltaY);
-  if (wheelAccumulator !== 0 && Math.sign(wheelAccumulator) !== direction) wheelAccumulator = 0;
-
-  if (wheelGestureLocked) {
-    scheduleWheelGestureReset();
-    return;
-  }
-
-  wheelAccumulator += event.deltaY;
-  if (Math.abs(wheelAccumulator) < STEP_SCROLL_THRESHOLD) {
-    scheduleWheelGestureReset();
-    return;
-  }
-
-  const currentIndex = nearestSceneIndex(lenis.scroll);
-  const nextIndex = clampSceneIndex(currentIndex + direction);
-  wheelAccumulator = 0;
-  wheelGestureLocked = true;
-  wheelLockUntil = performance.now() + STEP_SCROLL_DURATION;
-  document.documentElement.dataset.scrollLocked = String(nextIndex);
-  scrollToScene(nextIndex);
-  scheduleWheelGestureReset();
 }
 
 function initialiseScroller(): void {
@@ -158,7 +104,7 @@ function initialiseScroller(): void {
     const easing = (progress: number): number => 1 - Math.pow(1 - progress, 4);
     lenis = new Lenis({
       autoRaf: true,
-      smoothWheel: false,
+      smoothWheel: true,
       syncTouch: false,
       duration: 0.82,
       easing,
@@ -466,8 +412,6 @@ reducedMotionQuery.addEventListener("change", (event) => {
 });
 
 coarsePointerQuery.addEventListener("change", initialiseScroller);
-
-window.addEventListener("wheel", onStepWheel, { passive: false, capture: true });
 
 document.addEventListener("visibilitychange", () => {
   syncScrollerState();

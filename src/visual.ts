@@ -62,7 +62,7 @@ export const VISUAL_STATES: readonly VisualState[] = [
     index: 1,
     code: "001",
     label: "FORM",
-    line: "MATTER TAKES A POSITION.",
+    line: "PAINTING / STATUE / VESSEL",
     title: "THE DEATH OF SOCRATES",
     artist: "JACQUES LOUIS DAVID",
     date: "1787",
@@ -77,7 +77,7 @@ export const VISUAL_STATES: readonly VisualState[] = [
     index: 2,
     code: "002",
     label: "GESTURE",
-    line: "THE BODY INVENTS THE LINE.",
+    line: "PAINTING / DANCER / FAN",
     title: "THE DANCE CLASS",
     artist: "EDGAR DEGAS",
     date: "1874",
@@ -92,7 +92,7 @@ export const VISUAL_STATES: readonly VisualState[] = [
     index: 3,
     code: "003",
     label: "AFTERIMAGE",
-    line: "LIGHT OUTLIVES THE MOMENT.",
+    line: "LANDSCAPE / PORTRAIT / FLOWERS",
     title: "WHEAT FIELD WITH CYPRESSES",
     artist: "VINCENT VAN GOGH",
     date: "1889",
@@ -951,17 +951,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     });
   };
 
-  const moveLayer = (layer: LayerRecord, deltaX: number, deltaY: number): void => {
-    const width = Math.max(stage.clientWidth, 1);
-    const height = Math.max(stage.clientHeight, 1);
-    const aspect = width / height;
-    layer.userOffsetX += (deltaX / width) * aspect * 2;
-    layer.userOffsetY -= (deltaY / height) * 2;
-    constrainLayerToPage(layer);
-    syncManipulationDataset(layer);
-    requestRender();
-  };
-
   const moveDraggedLayer = (layer: LayerRecord, clientX: number, clientY: number): void => {
     const width = Math.max(stage.clientWidth, 1);
     const height = Math.max(stage.clientHeight, 1);
@@ -1136,10 +1125,6 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       setResizingArtwork(true);
       scheduleResizeEnd();
       scaleLayer(layer, layer.userScale * Math.exp(-event.deltaY * 0.006));
-      setHoveredLayer(layer);
-    } else if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 0.72 && Math.abs(event.deltaX) > 1) {
-      event.preventDefault();
-      moveLayer(layer, -event.deltaX * 0.72, event.altKey ? event.deltaY * 0.5 : 0);
       setHoveredLayer(layer);
     }
   };
