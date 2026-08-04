@@ -26,17 +26,29 @@ function clampVolume(value: number): number {
   return Math.max(0, Math.min(MAX_VOLUME, value));
 }
 
-function selectSource(): string {
-  const probe = document.createElement("audio");
-  return probe.canPlayType('audio/ogg; codecs="opus"') ? OPUS_SOURCE : MP3_SOURCE;
-}
-
-function createAudio(source: string): HTMLAudioElement {
+function createAudio(): HTMLAudioElement {
   const audio = new Audio();
-  audio.src = source;
   audio.preload = "metadata";
   audio.loop = false;
+  const opus = document.createElement("source");
+  opus.src = OPUS_SOURCE;
+  opus.type = 'audio/ogg; codecs="opus"';
+  const mp3 = document.createElement("source");
+  mp3.src = MP3_SOURCE;
+  mp3.type = "audio/mpeg";
+  audio.append(opus, mp3);
+  audio.load();
   return audio;
+}
+
+function holdParameter(parameter: AudioParam, time: number): void {
+  if (typeof parameter.cancelAndHoldAtTime === "function") {
+    parameter.cancelAndHoldAtTime(time);
+    return;
+  }
+  const value = parameter.value;
+  parameter.cancelScheduledValues(time);
+  parameter.setValueAtTime(value, time);
 }
 
 export function createSoundController(options: SoundOptions): SoundController {
@@ -48,8 +60,7 @@ export function createSoundController(options: SoundOptions): SoundController {
   master.gain.value = 0;
   master.connect(context.destination);
 
-  const source = selectSource();
-  const decks: Deck[] = [createAudio(source), createAudio(source)].map((audio, index) => {
+  const decks: Deck[] = [createAudio(), createAudio()].map((audio, index) => {
     const gain = context.createGain();
     gain.gain.value = index === 0 ? 1 : 0;
     context.createMediaElementSource(audio).connect(gain).connect(master);
@@ -77,7 +88,7 @@ export function createSoundController(options: SoundOptions): SoundController {
 
   function setDeckGain(deck: Deck, value: number, duration = 0): void {
     const now = context.currentTime;
-    deck.gain.gain.cancelAndHoldAtTime(now);
+    holdParameter(deck.gain.gain, now);
     if (duration > 0) deck.gain.gain.linearRampToValueAtTime(value, now + duration);
     else deck.gain.gain.setValueAtTime(value, now);
   }
@@ -135,7 +146,7 @@ export function createSoundController(options: SoundOptions): SoundController {
     await Promise.all([resume, play]);
     playing = true;
     const now = context.currentTime;
-    master.gain.cancelAndHoldAtTime(now);
+    holdParameter(master.gain, now);
     master.gain.linearRampToValueAtTime(preferredVolume, now + FADE_IN_SECONDS);
     options.onStateChange(true, preferredVolume);
   }
@@ -144,7 +155,7 @@ export function createSoundController(options: SoundOptions): SoundController {
     if (!playing) return;
     playing = false;
     const now = context.currentTime;
-    master.gain.cancelAndHoldAtTime(now);
+    holdParameter(master.gain, now);
     master.gain.linearRampToValueAtTime(0, now + FADE_OUT_SECONDS);
     options.onStateChange(false, preferredVolume);
     cancelPause();
@@ -172,7 +183,7 @@ export function createSoundController(options: SoundOptions): SoundController {
         return;
       }
       const now = context.currentTime;
-      master.gain.cancelAndHoldAtTime(now);
+      holdParameter(master.gain, now);
       master.gain.linearRampToValueAtTime(preferredVolume, now + 0.08);
       options.onStateChange(true, preferredVolume);
     },
@@ -188,6 +199,7 @@ export function createSoundController(options: SoundOptions): SoundController {
       decks.forEach((deck) => {
         deck.audio.pause();
         deck.audio.removeAttribute("src");
+        deck.audio.replaceChildren();
         deck.audio.load();
         deck.gain.disconnect();
       });

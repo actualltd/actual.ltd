@@ -76,6 +76,7 @@ function updateSoundControl(playing: boolean, volume: number): void {
   soundToggle.setAttribute("aria-pressed", String(playing));
   soundToggle.setAttribute("aria-label", playing ? "Mute music" : "Play music");
   soundOutput.value = String(displayVolume);
+  if (playing) delete soundControl.dataset.error;
 }
 
 function initialiseSound(): SoundController {
@@ -344,13 +345,14 @@ soundToggle.addEventListener("click", async () => {
   try {
     const controller = initialiseSound();
     await controller.toggle();
-  } catch {
-    soundControl.dataset.state = "unavailable";
-    soundToggle.textContent = "SOUND—N/A";
-    soundToggle.setAttribute("aria-label", "Music unavailable");
+  } catch (error) {
+    sound?.destroy();
+    sound = null;
+    soundControl.dataset.error = error instanceof Error ? error.name : "unknown";
+    updateSoundControl(false, Number(soundLevel.value) / 100);
   } finally {
     soundStarting = false;
-    if (soundControl.dataset.state !== "unavailable") soundToggle.disabled = false;
+    soundToggle.disabled = false;
   }
 });
 
