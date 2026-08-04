@@ -46,13 +46,29 @@
           <span id="record-label">FORM</span>
           <span class="density-ramp" aria-hidden="true">.:-=+*#%@</span>
         </div>
-        <div class="view-controls" role="group" aria-label="Artwork controls">
+        <div class="view-controls" role="group" aria-label="Artwork and sound controls">
           <button class="view-control" id="view-control" type="button" aria-pressed="false" aria-label="Show full-color artwork">
             VIEW—DITHER
           </button>
           <button class="motion-control" id="motion-control" type="button" aria-pressed="true">
             MOTION—ON
           </button>
+          <div class="sound-control" id="sound-control" data-state="off">
+            <button
+              class="sound-toggle"
+              id="sound-toggle"
+              type="button"
+              aria-pressed="false"
+              aria-controls="sound-level"
+            >
+              SOUND—OFF
+            </button>
+            <label class="sound-level" for="sound-level">
+              <span class="visually-hidden">Music volume</span>
+              <input id="sound-level" type="range" min="0" max="60" step="1" value="18" />
+              <output id="sound-output" for="sound-level">18</output>
+            </label>
+          </div>
         </div>
       </header>
 
@@ -206,7 +222,7 @@
 
       <noscript>
         <style>
-          .motion-control, .view-control { display: none; }
+          .motion-control, .view-control, .sound-control { display: none; }
         </style>
       </noscript>
     </main>

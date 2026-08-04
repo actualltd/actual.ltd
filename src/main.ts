@@ -2,6 +2,7 @@ import Lenis from "lenis";
 import LenisSnap from "lenis/snap";
 import "lenis/dist/lenis.css";
 import "./styles.css";
+import { createSoundController, type SoundController } from "./sound";
 import type { ArtworkSelection, VisualController, VisualState } from "./visual";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
@@ -15,6 +16,10 @@ const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const viewControl = requireElement<HTMLButtonElement>("#view-control");
 const motionControl = requireElement<HTMLButtonElement>("#motion-control");
+const soundControl = requireElement<HTMLDivElement>("#sound-control");
+const soundToggle = requireElement<HTMLButtonElement>("#sound-toggle");
+const soundLevel = requireElement<HTMLInputElement>("#sound-level");
+const soundOutput = requireElement<HTMLOutputElement>("#sound-output");
 const scrollIndex = requireElement<HTMLSpanElement>("#scroll-index");
 const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
 const sceneLine = requireElement<HTMLSpanElement>("#scene-line");
@@ -54,6 +59,33 @@ let actualView = false;
 let artworkInteracting = false;
 let activeVisualState: VisualState | null = null;
 let artworkCloseTimer = 0;
+let sound: SoundController | null = null;
+let soundStarting = false;
+
+const storedSoundLevel = Number.parseInt(localStorage.getItem("actual:sound-level") ?? "18", 10);
+const initialSoundLevel = Number.isFinite(storedSoundLevel)
+  ? Math.max(0, Math.min(60, storedSoundLevel))
+  : 18;
+soundLevel.value = String(initialSoundLevel);
+soundOutput.value = String(initialSoundLevel);
+
+function updateSoundControl(playing: boolean, volume: number): void {
+  const displayVolume = Math.round(volume * 100);
+  soundControl.dataset.state = playing ? "playing" : "off";
+  soundToggle.textContent = playing ? `SOUND—${String(displayVolume).padStart(2, "0")}` : "SOUND—OFF";
+  soundToggle.setAttribute("aria-pressed", String(playing));
+  soundToggle.setAttribute("aria-label", playing ? "Mute music" : "Play music");
+  soundOutput.value = String(displayVolume);
+}
+
+function initialiseSound(): SoundController {
+  if (sound) return sound;
+  sound = createSoundController({
+    initialVolume: Number(soundLevel.value) / 100,
+    onStateChange: updateSoundControl,
+  });
+  return sound;
+}
 
 function clampSceneIndex(index: number): number {
   return Math.max(0, Math.min(scrollScenes.length - 1, index));
@@ -305,6 +337,31 @@ motionControl.addEventListener("click", () => {
   updateMotionControl();
 });
 
+soundToggle.addEventListener("click", async () => {
+  if (soundStarting) return;
+  soundStarting = true;
+  soundToggle.disabled = true;
+  try {
+    const controller = initialiseSound();
+    await controller.toggle();
+  } catch {
+    soundControl.dataset.state = "unavailable";
+    soundToggle.textContent = "SOUND—N/A";
+    soundToggle.setAttribute("aria-label", "Music unavailable");
+  } finally {
+    soundStarting = false;
+    if (soundControl.dataset.state !== "unavailable") soundToggle.disabled = false;
+  }
+});
+
+soundLevel.addEventListener("input", () => {
+  const level = Math.max(0, Math.min(60, Number(soundLevel.value)));
+  localStorage.setItem("actual:sound-level", String(level));
+  soundOutput.value = String(level);
+  sound?.setVolume(level / 100);
+  if (sound?.isPlaying()) updateSoundControl(true, level / 100);
+});
+
 creditsControl.addEventListener("click", () => {
   if (!activeVisualState || creditsDialog.open) return;
   renderCredits(activeVisualState);
@@ -425,10 +482,12 @@ window.addEventListener("pagehide", (event) => {
   if (!event.persisted) {
     destroyScroller();
     visual?.destroy();
+    sound?.destroy();
   }
 }, { once: true });
 
 updateMotionControl();
 updateViewControl();
+updateSoundControl(false, initialSoundLevel / 100);
 initialiseScroller();
 requestAnimationFrame(() => void initialiseVisual());

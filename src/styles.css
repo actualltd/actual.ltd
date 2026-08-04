@@ -217,7 +217,7 @@ button {
   position: relative;
   display: flex;
   gap: 1.1rem;
-  min-width: 15rem;
+  min-width: 22rem;
   justify-content: flex-end;
   padding: 0.62rem 0.72rem 0 0;
   border-top: 1px solid var(--hairline);
@@ -235,7 +235,8 @@ button {
 }
 
 .view-control,
-.motion-control {
+.motion-control,
+.sound-toggle {
   appearance: none;
   padding: 0;
   border: 0;
@@ -246,7 +247,8 @@ button {
 }
 
 .view-control,
-.motion-control {
+.motion-control,
+.sound-toggle {
   position: relative;
   min-height: 2.4rem;
   font-family: "Geist Mono Variable", ui-monospace, monospace;
@@ -257,6 +259,7 @@ button {
 
 .view-control::after,
 .motion-control::after,
+.sound-toggle::after,
 .email::after,
 .credits-control::after {
   position: absolute;
@@ -276,6 +279,8 @@ button {
 .view-control:focus-visible::after,
 .motion-control:hover::after,
 .motion-control:focus-visible::after,
+.sound-toggle:hover::after,
+.sound-toggle:focus-visible::after,
 .email:hover::after,
 .email:focus-visible::after,
 .credits-control:hover::after,
@@ -285,9 +290,98 @@ button {
 }
 
 .view-control:disabled,
-.motion-control:disabled {
+.motion-control:disabled,
+.sound-toggle:disabled {
   cursor: default;
   opacity: 0.48;
+}
+
+.sound-control {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sound-control::before {
+  position: absolute;
+  z-index: 0;
+  top: calc(100% - 0.45rem);
+  right: -0.8rem;
+  width: 9.4rem;
+  height: 3.6rem;
+  content: "";
+}
+
+.sound-toggle {
+  z-index: 1;
+}
+
+.sound-level {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% - 0.2rem);
+  right: -0.7rem;
+  display: grid;
+  width: 8.5rem;
+  grid-template-columns: 1fr 1.55rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.8rem 0.7rem 0.7rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.25rem);
+  transition: opacity 180ms ease, transform 360ms var(--ease-out);
+}
+
+.sound-control[data-state="playing"]:hover .sound-level,
+.sound-control[data-state="playing"]:focus-within .sound-level {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.sound-level input {
+  width: 100%;
+  height: 1rem;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.sound-level input::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--hairline);
+}
+
+.sound-level input::-webkit-slider-thumb {
+  width: 5px;
+  height: 9px;
+  margin-top: -4px;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+}
+
+.sound-level input::-moz-range-track {
+  height: 1px;
+  border: 0;
+  background: var(--hairline);
+}
+
+.sound-level input::-moz-range-thumb {
+  width: 5px;
+  height: 9px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+}
+
+.sound-level output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .identity {
@@ -494,6 +588,8 @@ html[data-art-active] .plate-gesture {
 
 .view-control:focus-visible,
 .motion-control:focus-visible,
+.sound-toggle:focus-visible,
+.sound-level input:focus-visible,
 .email:focus-visible,
 .actual-mark:focus-visible,
 .company-close:focus-visible,
@@ -1118,13 +1214,20 @@ html[data-art-active] .plate-gesture {
   }
 
   .view-control,
-  .motion-control {
+  .motion-control,
+  .sound-toggle {
     min-height: 1.7rem;
   }
 
   .view-control::after,
-  .motion-control::after {
+  .motion-control::after,
+  .sound-toggle::after {
     bottom: 0.2rem;
+  }
+
+  .sound-level {
+    top: calc(100% - 0.3rem);
+    width: 7.8rem;
   }
 
   .plate-note {
