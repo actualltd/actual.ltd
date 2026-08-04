@@ -902,6 +902,10 @@ html[data-art-active] .plate-gesture {
   backdrop-filter: grayscale(1);
 }
 
+.artwork-dialog[open]::backdrop {
+  animation: artwork-backdrop-enter 280ms ease-out both;
+}
+
 .artwork-dialog__media {
   --viewer-pad: clamp(1rem, 2vw, 2rem);
   display: grid;
@@ -936,8 +940,31 @@ html[data-art-active] .plate-gesture {
   animation: artwork-media-enter 220ms var(--ease-out) both;
 }
 
+.artwork-dialog[open] .artwork-dialog__media img {
+  animation: artwork-image-enter 280ms var(--ease-out) both;
+}
+
 .artwork-dialog[open] .artwork-dialog__details {
   animation: artwork-details-enter 320ms var(--ease-out) both;
+}
+
+.artwork-dialog.is-closing {
+  pointer-events: none;
+  animation: artwork-dialog-exit 180ms ease-in both;
+}
+
+.artwork-dialog.is-closing::backdrop {
+  animation: artwork-backdrop-exit 180ms ease-in both;
+}
+
+@keyframes artwork-backdrop-enter {
+  from { background: transparent; backdrop-filter: grayscale(0); }
+  to { background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: grayscale(1); }
+}
+
+@keyframes artwork-backdrop-exit {
+  from { background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: grayscale(1); }
+  to { background: transparent; backdrop-filter: grayscale(0); }
 }
 
 @keyframes artwork-media-enter {
@@ -945,9 +972,19 @@ html[data-art-active] .plate-gesture {
   to { transform: scale(1); filter: contrast(1); }
 }
 
+@keyframes artwork-image-enter {
+  from { opacity: 0.38; transform: scale(1.012); filter: grayscale(1) contrast(0.78); }
+  to { opacity: 1; transform: scale(1); filter: grayscale(0) contrast(1); }
+}
+
 @keyframes artwork-details-enter {
   from { opacity: 0.72; transform: translateX(0.45rem); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes artwork-dialog-exit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.995); }
 }
 
 .artwork-dialog__header,
