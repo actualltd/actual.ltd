@@ -1,10 +1,9 @@
-import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [
-    cloudflare({
-      viteEnvironment: { name: "server" },
-    }),
-  ],
+  base: "/",
+  build: {
+    emptyOutDir: true,
+    outDir: "dist",
+  },
 });
