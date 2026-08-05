@@ -3,11 +3,20 @@ const MP3_SOURCE = "/audio/actual-signal-study-01.mp3";
 const CROSSFADE_SECONDS = 1.25;
 const FADE_IN_SECONDS = 1.5;
 const FADE_OUT_SECONDS = 0.8;
-const MAX_VOLUME = 0.6;
+const MAX_TRIM_VOLUME = 0.6;
+
+export type SoundOutputMode = "device" | "trim";
+
+export interface SoundState {
+  playing: boolean;
+  mode: SoundOutputMode;
+  trimVolume: number;
+}
 
 interface SoundOptions {
-  initialVolume: number;
-  onStateChange: (playing: boolean, volume: number) => void;
+  initialTrimVolume: number;
+  outputMode: SoundOutputMode;
+  onStateChange: (state: SoundState) => void;
 }
 
 interface Deck {
@@ -17,13 +26,14 @@ interface Deck {
 
 export interface SoundController {
   toggle(): Promise<void>;
-  setVolume(volume: number): void;
+  setOutputMode(mode: SoundOutputMode): void;
+  setTrimVolume(volume: number): void;
   isPlaying(): boolean;
   destroy(): void;
 }
 
-function clampVolume(value: number): number {
-  return Math.max(0, Math.min(MAX_VOLUME, value));
+function clampTrimVolume(value: number): number {
+  return Math.max(0, Math.min(MAX_TRIM_VOLUME, value));
 }
 
 function createAudio(): HTMLAudioElement {
@@ -67,7 +77,8 @@ export function createSoundController(options: SoundOptions): SoundController {
     return { audio, gain };
   });
 
-  let preferredVolume = clampVolume(options.initialVolume);
+  let trimVolume = clampTrimVolume(options.initialTrimVolume);
+  let outputMode = options.outputMode;
   let activeIndex = 0;
   let playing = false;
   let crossing = false;
@@ -75,6 +86,16 @@ export function createSoundController(options: SoundOptions): SoundController {
   let transitionTimer = 0;
   let pauseTimer = 0;
   let destroyed = false;
+
+  const effectiveVolume = (): number => outputMode === "device" ? 1 : trimVolume;
+  const notify = (): void => options.onStateChange({ playing, mode: outputMode, trimVolume });
+
+  const rampMaster = (volume: number, duration: number): void => {
+    const now = context.currentTime;
+    holdParameter(master.gain, now);
+    if (duration > 0) master.gain.linearRampToValueAtTime(volume, now + duration);
+    else master.gain.setValueAtTime(volume, now);
+  };
 
   function cancelPause(): void {
     if (pauseTimer !== 0) window.clearTimeout(pauseTimer);
@@ -145,19 +166,15 @@ export function createSoundController(options: SoundOptions): SoundController {
     const play = active.audio.play();
     await Promise.all([resume, play]);
     playing = true;
-    const now = context.currentTime;
-    holdParameter(master.gain, now);
-    master.gain.linearRampToValueAtTime(preferredVolume, now + FADE_IN_SECONDS);
-    options.onStateChange(true, preferredVolume);
+    rampMaster(effectiveVolume(), FADE_IN_SECONDS);
+    notify();
   }
 
   function stop(): void {
     if (!playing) return;
     playing = false;
-    const now = context.currentTime;
-    holdParameter(master.gain, now);
-    master.gain.linearRampToValueAtTime(0, now + FADE_OUT_SECONDS);
-    options.onStateChange(false, preferredVolume);
+    rampMaster(0, FADE_OUT_SECONDS);
+    notify();
     cancelPause();
     pauseTimer = window.setTimeout(() => {
       pauseTimer = 0;
@@ -176,16 +193,15 @@ export function createSoundController(options: SoundOptions): SoundController {
       if (playing) stop();
       else await start();
     },
-    setVolume(volume: number): void {
-      preferredVolume = clampVolume(volume);
-      if (!playing) {
-        options.onStateChange(false, preferredVolume);
-        return;
-      }
-      const now = context.currentTime;
-      holdParameter(master.gain, now);
-      master.gain.linearRampToValueAtTime(preferredVolume, now + 0.08);
-      options.onStateChange(true, preferredVolume);
+    setOutputMode(mode: SoundOutputMode): void {
+      outputMode = mode;
+      if (playing) rampMaster(effectiveVolume(), 0.12);
+      notify();
+    },
+    setTrimVolume(volume: number): void {
+      trimVolume = clampTrimVolume(volume);
+      if (playing && outputMode === "trim") rampMaster(trimVolume, 0.08);
+      notify();
     },
     isPlaying(): boolean {
       return playing;

@@ -2,7 +2,12 @@ import Lenis from "lenis";
 import LenisSnap from "lenis/snap";
 import "lenis/dist/lenis.css";
 import "./styles.css";
-import { createSoundController, type SoundController } from "./sound";
+import {
+  createSoundController,
+  type SoundController,
+  type SoundOutputMode,
+  type SoundState,
+} from "./sound";
 import type { ArtworkSelection, VisualController, VisualState } from "./visual";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
@@ -12,6 +17,8 @@ function requireElement<T extends HTMLElement>(selector: string): T {
 }
 
 const visualLayer = requireElement<HTMLDivElement>("#visual-layer");
+const artPlate = requireElement<HTMLDivElement>(".art-plate");
+const artInteractionSurface = requireElement<HTMLSpanElement>("#art-interaction-surface");
 const indexElement = requireElement<HTMLSpanElement>("#record-index");
 const labelElement = requireElement<HTMLSpanElement>("#record-label");
 const viewControl = requireElement<HTMLButtonElement>("#view-control");
@@ -19,6 +26,7 @@ const motionControl = requireElement<HTMLButtonElement>("#motion-control");
 const soundControl = requireElement<HTMLDivElement>("#sound-control");
 const soundToggle = requireElement<HTMLButtonElement>("#sound-toggle");
 const soundLevel = requireElement<HTMLInputElement>("#sound-level");
+const soundLevelControl = requireElement<HTMLLabelElement>("#sound-level-control");
 const soundOutput = requireElement<HTMLOutputElement>("#sound-output");
 const scrollIndex = requireElement<HTMLSpanElement>("#scroll-index");
 const sceneStep = requireElement<HTMLSpanElement>("#scene-step");
@@ -47,6 +55,7 @@ const artworkDetailSource = requireElement<HTMLAnchorElement>("#artwork-detail-s
 const scrollScenes = [...document.querySelectorAll<HTMLElement>("[data-scroll-scene]")];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const coarsePointerQuery = window.matchMedia("(any-pointer: coarse)");
+const deviceVolumeQuery = window.matchMedia("(max-width: 700px), (hover: none) and (pointer: coarse)");
 
 let userMotionPreference: boolean | null = null;
 let motionEnabled = !reducedMotionQuery.matches;
@@ -68,24 +77,45 @@ const initialSoundLevel = Number.isFinite(storedSoundLevel)
   : 18;
 soundLevel.value = String(initialSoundLevel);
 soundOutput.value = String(initialSoundLevel);
+let soundState: SoundState = {
+  playing: false,
+  mode: deviceVolumeQuery.matches ? "device" : "trim",
+  trimVolume: initialSoundLevel / 100,
+};
 
-function updateSoundControl(playing: boolean, volume: number): void {
-  const displayVolume = Math.round(volume * 100);
-  soundControl.dataset.state = playing ? "playing" : "off";
-  soundToggle.textContent = playing ? `SOUND—${String(displayVolume).padStart(2, "0")}` : "SOUND—OFF";
-  soundToggle.setAttribute("aria-pressed", String(playing));
-  soundToggle.setAttribute("aria-label", playing ? "Mute music" : "Play music");
+function updateSoundControl(state: SoundState): void {
+  soundState = state;
+  const displayVolume = Math.round(state.trimVolume * 100);
+  const deviceLed = state.mode === "device";
+  soundControl.dataset.state = state.playing ? "playing" : "off";
+  soundControl.dataset.mode = state.mode;
+  soundLevelControl.hidden = deviceLed;
+  soundLevel.disabled = deviceLed;
+  if (deviceLed) soundToggle.removeAttribute("aria-controls");
+  else soundToggle.setAttribute("aria-controls", "sound-level");
+  soundToggle.textContent = state.playing
+    ? deviceLed ? "SOUND—ON" : `SOUND—${String(displayVolume).padStart(2, "0")}`
+    : "SOUND—OFF";
+  soundToggle.setAttribute("aria-pressed", String(state.playing));
+  soundToggle.setAttribute("aria-label", state.playing ? "Mute music" : "Play music");
   soundOutput.value = String(displayVolume);
-  if (playing) delete soundControl.dataset.error;
+  if (state.playing) delete soundControl.dataset.error;
 }
 
 function initialiseSound(): SoundController {
   if (sound) return sound;
   sound = createSoundController({
-    initialVolume: Number(soundLevel.value) / 100,
+    initialTrimVolume: Number(soundLevel.value) / 100,
+    outputMode: soundState.mode,
     onStateChange: updateSoundControl,
   });
   return sound;
+}
+
+function updateSoundOutputMode(): void {
+  const mode: SoundOutputMode = deviceVolumeQuery.matches ? "device" : "trim";
+  if (sound) sound.setOutputMode(mode);
+  else updateSoundControl({ ...soundState, mode });
 }
 
 function clampSceneIndex(index: number): number {
@@ -297,6 +327,8 @@ async function initialiseVisual(): Promise<void> {
   try {
     const { createVisual } = await import("./visual");
     visual = createVisual(visualLayer, {
+      plateElement: artPlate,
+      interactionElement: artInteractionSurface,
       motionEnabled,
       reducedMotion: reducedMotionQuery.matches,
       onStateChange: updateRecord,
@@ -349,7 +381,7 @@ soundToggle.addEventListener("click", async () => {
     sound?.destroy();
     sound = null;
     soundControl.dataset.error = error instanceof Error ? error.name : "unknown";
-    updateSoundControl(false, Number(soundLevel.value) / 100);
+    updateSoundControl({ ...soundState, playing: false });
   } finally {
     soundStarting = false;
     soundToggle.disabled = false;
@@ -360,8 +392,8 @@ soundLevel.addEventListener("input", () => {
   const level = Math.max(0, Math.min(60, Number(soundLevel.value)));
   localStorage.setItem("actual:sound-level", String(level));
   soundOutput.value = String(level);
-  sound?.setVolume(level / 100);
-  if (sound?.isPlaying()) updateSoundControl(true, level / 100);
+  if (sound) sound.setTrimVolume(level / 100);
+  else updateSoundControl({ ...soundState, trimVolume: level / 100 });
 });
 
 creditsControl.addEventListener("click", () => {
@@ -471,6 +503,7 @@ reducedMotionQuery.addEventListener("change", (event) => {
 });
 
 coarsePointerQuery.addEventListener("change", initialiseScroller);
+deviceVolumeQuery.addEventListener("change", updateSoundOutputMode);
 
 document.addEventListener("visibilitychange", () => {
   syncScrollerState();
@@ -490,6 +523,6 @@ window.addEventListener("pagehide", (event) => {
 
 updateMotionControl();
 updateViewControl();
-updateSoundControl(false, initialSoundLevel / 100);
+updateSoundControl(soundState);
 initialiseScroller();
 requestAnimationFrame(() => void initialiseVisual());

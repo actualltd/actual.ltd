@@ -25,11 +25,13 @@ result="$(browser eval --stdin <<'EVALEOF'
   const dialog = document.querySelector("#artwork-dialog");
   const close = document.querySelector("#artwork-close");
   const engine = document.querySelector(".art-engine");
-  if (!(dialog instanceof HTMLDialogElement) || !(close instanceof HTMLButtonElement) || !(engine instanceof HTMLElement)) {
+  const surface = document.querySelector("#art-interaction-surface");
+  if (!(dialog instanceof HTMLDialogElement) || !(close instanceof HTMLButtonElement)
+    || !(engine instanceof HTMLElement) || !(surface instanceof HTMLElement)) {
     return { ok: false };
   }
 
-  const pointer = (type, x, y, pointerType = "mouse", buttons = 0, pointerId = 17) => window.dispatchEvent(new PointerEvent(type, {
+  const pointer = (type, x, y, pointerType = "mouse", buttons = 0, pointerId = 17) => surface.dispatchEvent(new PointerEvent(type, {
     bubbles: true,
     cancelable: true,
     pointerId,
@@ -58,7 +60,7 @@ result="$(browser eval --stdin <<'EVALEOF'
   };
 
   close.click();
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await new Promise((resolve) => setTimeout(resolve, 240));
   pointer("pointermove", 980, 485);
   pointer("pointerdown", 980, 485, "mouse", 1);
   pointer("pointermove", 1040, 445, "mouse", 1);
@@ -77,7 +79,7 @@ result="$(browser eval --stdin <<'EVALEOF'
   await new Promise((resolve) => setTimeout(resolve, 120));
   const touchView = { open: dialog.open, title: dialog.querySelector("#artwork-detail-title")?.textContent?.trim() };
   close.click();
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await new Promise((resolve) => setTimeout(resolve, 240));
 
   pointer("pointermove", 700, 280);
   pointer("pointerdown", 700, 280, "mouse", 1, 31);
@@ -105,7 +107,7 @@ if ACTUAL_ARTWORK_VIEWER_RESULT="$result" node -e '
     && result.objectView.image === "/art/archive/form-object.webp"
     && result.objectView.loaded === true
     && result.objectView.source === "https://www.metmuseum.org/art/collection/search/255154"
-    && /(rgba?\(|\/ 0\.72)/.test(result.objectView.backdrop)
+    && result.objectView.backdrop !== "rgba(0, 0, 0, 0)"
     && result.drag.opened === false
     && Math.hypot(offsetX, offsetY) > 0.05
     && result.touchView.open === true

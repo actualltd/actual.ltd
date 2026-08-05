@@ -28,6 +28,8 @@
   --edge: clamp(1rem, 2.2vw, 2.25rem);
   --plate-w: min(68vw, 940px);
   --plate-h: min(64svh, 680px);
+  --plate-left: 50%;
+  --plate-top: 50%;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -333,6 +335,10 @@ button {
   transition: opacity 180ms ease, transform 360ms var(--ease-out);
 }
 
+.sound-level[hidden] {
+  display: none;
+}
+
 .sound-control[data-state="playing"]:hover .sound-level,
 .sound-control[data-state="playing"]:focus-within .sound-level {
   opacity: 1;
@@ -393,12 +399,21 @@ button {
 
 .art-plate {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: var(--plate-top);
+  left: var(--plate-left);
   width: var(--plate-w);
   height: var(--plate-h);
   border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
   transform: translate(-50%, -50%);
+}
+
+.art-interaction-surface {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: block;
+  pointer-events: auto;
+  touch-action: pan-y;
 }
 
 .crop-mark {
@@ -484,8 +499,8 @@ html[data-art-active] .plate-gesture {
 
 .scene-copy {
   position: absolute;
-  top: calc(50% + (var(--plate-h) / 2) + clamp(0.65rem, 1.5vh, 1rem));
-  left: calc(50% - (var(--plate-w) / 2));
+  top: calc(var(--plate-top) + (var(--plate-h) / 2) + clamp(0.65rem, 1.5vh, 1rem));
+  left: calc(var(--plate-left) - (var(--plate-w) / 2));
   display: grid;
   width: var(--plate-w);
   gap: 0.25rem;
@@ -1179,15 +1194,17 @@ html[data-art-active] .plate-gesture {
   text-decoration: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (hover: none) and (pointer: coarse) and (orientation: portrait) {
   :root {
-    --edge: 1rem;
-    --plate-w: calc(100vw - 32px);
-    --plate-h: 60svh;
+    --edge: 0.75rem;
+    --plate-w: calc(100vw - 24px);
+    --plate-h: min(54svh, 34rem);
+    --plate-left: 50%;
+    --plate-top: 46%;
   }
 
   .site-shell {
-    min-height: 34rem;
+    min-height: 0;
   }
 
   .masthead,
@@ -1196,7 +1213,7 @@ html[data-art-active] .plate-gesture {
   }
 
   .record-meta {
-    min-width: 8.5rem;
+    min-width: 7.8rem;
     gap: 0.34rem 0.48rem;
     padding: 0.5rem 0 0 0.52rem;
   }
@@ -1208,21 +1225,28 @@ html[data-art-active] .plate-gesture {
 
   .view-controls {
     display: grid;
-    min-width: 8.8rem;
-    gap: 0;
+    width: 10.8rem;
+    min-width: 0;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.55rem;
     padding: 0.42rem 0.52rem 0 0;
   }
 
   .view-control,
   .motion-control,
   .sound-toggle {
-    min-height: 1.7rem;
+    min-height: 2.75rem;
+  }
+
+  .sound-control {
+    grid-column: 1 / -1;
+    min-height: 2.75rem;
   }
 
   .view-control::after,
   .motion-control::after,
   .sound-toggle::after {
-    bottom: 0.2rem;
+    bottom: 0.48rem;
   }
 
   .sound-level {
@@ -1241,12 +1265,12 @@ html[data-art-active] .plate-gesture {
   }
 
   .scene-copy {
-    top: calc(50% + (var(--plate-h) / 2) + 0.65rem);
+    top: calc(var(--plate-top) + (var(--plate-h) / 2) + 0.65rem);
     gap: 0.2rem;
   }
 
   .scene-line {
-    font-size: clamp(1.35rem, 6.2vw, 1.8rem);
+    font-size: clamp(1.28rem, 6.1vw, 1.8rem);
     letter-spacing: -0.04em;
   }
 
@@ -1286,6 +1310,8 @@ html[data-art-active] .plate-gesture {
     inset: auto 1rem max(1rem, env(safe-area-inset-bottom)) 1rem;
     width: auto;
     max-height: 72svh;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .credits-dialog__header {
@@ -1332,6 +1358,8 @@ html[data-art-active] .plate-gesture {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(48svh, 1fr) auto;
     overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .artwork-dialog__media {
@@ -1351,6 +1379,138 @@ html[data-art-active] .plate-gesture {
 
   .artwork-dialog h2 {
     font-size: clamp(1.8rem, 10vw, 2.8rem);
+  }
+
+  .company-close,
+  .credits-close,
+  .artwork-close {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .sound-control::before,
+  .sound-level {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 620px) and (orientation: portrait) {
+  :root {
+    --plate-h: 48svh;
+    --plate-top: 44%;
+  }
+
+  .density-ramp,
+  .plate-gesture {
+    display: none;
+  }
+
+  .scene-line {
+    font-size: clamp(1.12rem, 5.8vw, 1.55rem);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+  :root {
+    --edge: 0.65rem;
+    --plate-w: 62vw;
+    --plate-h: calc(100svh - 8rem);
+    --plate-left: 34%;
+    --plate-top: 50%;
+  }
+
+  .site-shell {
+    min-height: 0;
+  }
+
+  .masthead,
+  .footer {
+    font-size: 0.56rem;
+  }
+
+  .record-meta {
+    min-width: 9.5rem;
+  }
+
+  .density-ramp,
+  .plate-note,
+  .plate-gesture {
+    display: none;
+  }
+
+  .view-controls {
+    display: flex;
+    width: auto;
+    min-width: 21rem;
+    gap: 0.9rem;
+  }
+
+  .view-control,
+  .motion-control,
+  .sound-toggle {
+    min-height: 2.75rem;
+  }
+
+  .scene-copy {
+    top: 34%;
+    left: 69%;
+    width: calc(31vw - 1.4rem);
+    gap: 0.28rem;
+  }
+
+  .scene-line {
+    font-size: clamp(1.08rem, 2.5vw, 1.55rem);
+    line-height: 0.98;
+  }
+
+  .scene-caption {
+    flex-direction: column;
+    gap: 0.12rem;
+  }
+
+  .scene-caption span + span::before {
+    display: none;
+  }
+
+  .scroll-cue {
+    right: 30.5vw;
+  }
+
+  .scroll-label-desktop {
+    display: none;
+  }
+
+  .scroll-label-touch {
+    display: block;
+  }
+
+  .edition,
+  .email {
+    min-width: 10rem;
+  }
+
+  .company-dialog,
+  .credits-dialog {
+    max-height: calc(100svh - 1.3rem);
+  }
+
+  .artwork-dialog {
+    inset: 0.35rem;
+    width: calc(100vw - 0.7rem);
+    height: calc(100svh - 0.7rem);
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 34vw);
+    grid-template-rows: 1fr;
+  }
+
+  .artwork-dialog__media {
+    min-height: 0;
+    border-right: 1px solid var(--hairline);
+    border-bottom: 0;
   }
 }
 

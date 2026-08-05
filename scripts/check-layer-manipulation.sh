@@ -25,7 +25,8 @@ result="$(browser eval --stdin <<'EVALEOF'
   window.scrollTo(0, 0);
   await new Promise((resolve) => setTimeout(resolve, 400));
   const engine = document.querySelector(".art-engine");
-  if (!(engine instanceof HTMLElement)) return { ok: false };
+  const surface = document.querySelector("#art-interaction-surface");
+  if (!(engine instanceof HTMLElement) || !(surface instanceof HTMLElement)) return { ok: false };
 
   const pointer = (type, x, y, buttons = 0) => window.dispatchEvent(new PointerEvent(type, {
     bubbles: true,
@@ -74,7 +75,7 @@ result="$(browser eval --stdin <<'EVALEOF'
       clientX: { value: gestureX },
       clientY: { value: gestureY },
     });
-    window.dispatchEvent(gestureEvent);
+    surface.dispatchEvent(gestureEvent);
   };
   gesture("gesturestart", 1);
   gesture("gesturechange", 1.8);
@@ -91,7 +92,7 @@ result="$(browser eval --stdin <<'EVALEOF'
   await new Promise((resolve) => setTimeout(resolve, 900));
   const gestureReset = { scale: engine.dataset.layerScale, offset: engine.dataset.layerOffset };
 
-  window.dispatchEvent(new WheelEvent("wheel", { clientX: 980, clientY: 485, deltaX: 52, deltaY: 3, cancelable: true }));
+  surface.dispatchEvent(new WheelEvent("wheel", { bubbles: true, clientX: 980, clientY: 485, deltaX: 52, deltaY: 3, cancelable: true }));
   const trackpad = { offset: engine.dataset.layerOffset };
   return { ok: true, dragged, pinched, shrunk, resizeLock, reset, nativeGesture, gestureReset, trackpad };
 })()

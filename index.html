@@ -63,7 +63,7 @@
             >
               SOUND—OFF
             </button>
-            <label class="sound-level" for="sound-level">
+            <label class="sound-level" id="sound-level-control" for="sound-level">
               <span class="visually-hidden">Music volume</span>
               <input id="sound-level" type="range" min="0" max="60" step="1" value="18" />
               <output id="sound-output" for="sound-level">18</output>
@@ -76,6 +76,7 @@
 
       <section class="identity" aria-label="Artwork record" aria-live="polite">
         <div class="art-plate" aria-hidden="true">
+          <span class="art-interaction-surface" id="art-interaction-surface"></span>
           <i class="crop-mark crop-mark-nw"></i>
           <i class="crop-mark crop-mark-ne"></i>
           <i class="crop-mark crop-mark-sw"></i>
@@ -83,7 +84,7 @@
           <span class="plate-axis plate-axis-x"></span>
           <span class="plate-axis plate-axis-y"></span>
           <span class="plate-note">ACT / 03</span>
-          <span class="plate-gesture">VIEW / DRAG / PINCH</span>
+          <span class="plate-gesture">SWIPE / DRAG / PINCH / TAP</span>
         </div>
         <div class="scene-copy">
           <span class="scene-step" id="scene-step">001 / FORM</span>

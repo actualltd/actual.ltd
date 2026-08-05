@@ -114,6 +114,8 @@ export interface VisualController {
 }
 
 interface VisualOptions {
+  plateElement: HTMLElement;
+  interactionElement: HTMLElement;
   motionEnabled: boolean;
   reducedMotion: boolean;
   onStateChange: (state: VisualState) => void;
@@ -184,6 +186,7 @@ const INK = new Vector4(20 / 255, 18 / 255, 15 / 255, 1);
 const ROLE_LAYERS: Record<LayerRole, number> = { environment: 0, figure: 1, object: 2 };
 const EFFECT_LAYER = 3;
 const MAX_DPR = 1.35;
+const MOBILE_PIXEL_BUDGET = 1_200_000;
 const PAGE_EDGE_INSET = 24;
 const SCALE_LIMITS: Record<LayerRole, { minScale: number; maxScale: number }> = {
   environment: { minScale: 0.48, maxScale: 1.80 },
@@ -345,10 +348,19 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   let dragMoved = false;
   let gestureLayer: LayerRecord | null = null;
   let gestureStartScale = 1;
+  const touchPointers = new Map<number, { x: number; y: number; onPlate: boolean }>();
+  let pointerPinchLayer: LayerRecord | null = null;
+  let pointerPinchStartDistance = 1;
+  let pointerPinchStartMidX = 0;
+  let pointerPinchStartMidY = 0;
+  let pointerPinchStartScale = 1;
+  let pointerPinchStartOffsetX = 0;
+  let pointerPinchStartOffsetY = 0;
   let lastGestureEndTime = -Infinity;
   let resizingArtwork = false;
   let resizeEndTimer = 0;
   let interactionActive = false;
+  const coarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)");
 
   const parallaxTargetX = motionValue(0);
   const parallaxTargetY = motionValue(0);
@@ -642,12 +654,21 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     const width = Math.max(stage.clientWidth, 1);
     const height = Math.max(stage.clientHeight, 1);
     const aspect = width / height;
-    const compact = width <= 700 || aspect < 0.82;
-    const plateWidth = compact ? Math.max(width - 32, 1) : Math.min(width * 0.68, 940);
-    const plateHeight = compact ? height * 0.60 : Math.min(height * 0.64, 680);
-    platePixels = { x: (width - plateWidth) / 2, y: (height - plateHeight) / 2, width: plateWidth, height: plateHeight };
+    const compact = coarsePointer.matches || width <= 700 || aspect < 0.82;
+    const stageBounds = stage.getBoundingClientRect();
+    const plateBounds = options.plateElement.getBoundingClientRect();
+    const plateWidth = Math.max(1, Math.min(width, plateBounds.width));
+    const plateHeight = Math.max(1, Math.min(height, plateBounds.height));
+    platePixels = {
+      x: Math.max(0, Math.min(width - plateWidth, plateBounds.left - stageBounds.left)),
+      y: Math.max(0, Math.min(height - plateHeight, plateBounds.top - stageBounds.top)),
+      width: plateWidth,
+      height: plateHeight,
+    };
     const plateWorldWidth = aspect * 2 * (plateWidth / width);
     const plateWorldHeight = 2 * (plateHeight / height);
+    const plateCenterX = ((platePixels.x + plateWidth * 0.5) / width * 2 - 1) * aspect;
+    const plateCenterY = 1 - ((platePixels.y + plateHeight * 0.5) / height * 2);
 
     camera.left = -aspect;
     camera.right = aspect;
@@ -668,8 +689,8 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
           meshWidth *= maxHeight / meshHeight;
           meshHeight = maxHeight;
         }
-        layer.baseX = plateWorldWidth * layout.x;
-        layer.baseY = plateWorldHeight * layout.y;
+        layer.baseX = plateCenterX + plateWorldWidth * layout.x;
+        layer.baseY = plateCenterY + plateWorldHeight * layout.y;
         layer.baseScaleX = meshWidth;
         layer.baseScaleY = meshHeight;
         layer.mesh.rotation.z = (((compact ? layerConfig.mobile.rotation : layerConfig.layout.rotation) ?? 0) * Math.PI) / 180;
@@ -681,7 +702,13 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       });
     });
 
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+    const mobileRendering = coarsePointer.matches || width <= 700;
+    const deviceDpr = window.devicePixelRatio || 1;
+    const budgetDpr = Math.sqrt(MOBILE_PIXEL_BUDGET / Math.max(width * height, 1));
+    const dpr = mobileRendering
+      ? Math.max(0.75, Math.min(deviceDpr, 1, budgetDpr))
+      : Math.min(deviceDpr, MAX_DPR);
+    stage.dataset.renderDpr = dpr.toFixed(2);
     const pixelWidth = Math.max(1, Math.floor(width * dpr));
     const pixelHeight = Math.max(1, Math.floor(height * dpr));
     renderer.setPixelRatio(dpr);
@@ -1012,7 +1039,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
 
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
   const isInterfaceTarget = (target: EventTarget | null): boolean => (
-    target instanceof Element && target.closest("button, a, dialog") !== null
+    target instanceof Element && target.closest("button, a, input, label, dialog") !== null
+  );
+
+  const isPlateTarget = (target: EventTarget | null): boolean => (
+    target instanceof Node && (target === options.interactionElement || options.interactionElement.contains(target))
   );
 
   const beginDirectDrag = (layer: LayerRecord): void => {
@@ -1023,8 +1054,55 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     syncInteractionState();
   };
 
+  const touchPair = (): Array<{ x: number; y: number; onPlate: boolean }> => (
+    [...touchPointers.values()].slice(0, 2)
+  );
+
+  const beginPointerPinch = (): boolean => {
+    const points = touchPair();
+    if (points.length < 2 || !points.every((point) => point.onPlate)) return false;
+    const midX = (points[0].x + points[1].x) * 0.5;
+    const midY = (points[0].y + points[1].y) * 0.5;
+    const layer = draggingLayer ?? hitTestLayer(midX, midY);
+    if (!layer) return false;
+    pointerPinchLayer = layer;
+    pointerPinchStartDistance = Math.max(1, Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y));
+    pointerPinchStartMidX = midX;
+    pointerPinchStartMidY = midY;
+    pointerPinchStartScale = layer.userScale;
+    pointerPinchStartOffsetX = layer.userOffsetX;
+    pointerPinchStartOffsetY = layer.userOffsetY;
+    draggingLayer = null;
+    draggingPointerId = -1;
+    dragPending = false;
+    dragMoved = true;
+    delete document.documentElement.dataset.artDragging;
+    setHoveredLayer(layer);
+    setResizingArtwork(true);
+    return true;
+  };
+
+  const endPointerPinch = (): void => {
+    if (!pointerPinchLayer) return;
+    syncManipulationDataset(pointerPinchLayer);
+    pointerPinchLayer = null;
+    lastGestureEndTime = performance.now();
+    setResizingArtwork(false);
+  };
+
   const onPointerDown = (event: PointerEvent): void => {
-    if (!event.isPrimary || event.button !== 0 || isInterfaceTarget(event.target)) return;
+    if (event.button !== 0 || isInterfaceTarget(event.target)) return;
+    if (event.pointerType !== "touch" && !event.isPrimary) return;
+    if (event.pointerType === "touch") {
+      touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, onPlate: isPlateTarget(event.target) });
+      if (touchPointers.size >= 2) {
+        if (beginPointerPinch()) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+        return;
+      }
+    }
     const layer = hitTestLayer(event.clientX, event.clientY);
     if (!layer) return;
     draggingLayer = layer;
@@ -1049,6 +1127,27 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     lastPointerY = event.clientY;
     parallaxTargetX.set((event.clientX / width - 0.5) * 2);
     parallaxTargetY.set((event.clientY / height - 0.5) * 2);
+
+    if (event.pointerType === "touch" && touchPointers.has(event.pointerId)) {
+      const point = touchPointers.get(event.pointerId)!;
+      touchPointers.set(event.pointerId, { ...point, x: event.clientX, y: event.clientY });
+    }
+
+    if (pointerPinchLayer) {
+      const points = touchPair();
+      if (points.length >= 2) {
+        const midX = (points[0].x + points[1].x) * 0.5;
+        const midY = (points[0].y + points[1].y) * 0.5;
+        const distance = Math.max(1, Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y));
+        const aspect = width / height;
+        pointerPinchLayer.userOffsetX = pointerPinchStartOffsetX + ((midX - pointerPinchStartMidX) / width) * aspect * 2;
+        pointerPinchLayer.userOffsetY = pointerPinchStartOffsetY - ((midY - pointerPinchStartMidY) / height) * 2;
+        scaleLayer(pointerPinchLayer, pointerPinchStartScale * Math.pow(distance / pointerPinchStartDistance, 1.08));
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
 
     if (draggingLayer && event.pointerId === draggingPointerId) {
       const totalX = event.clientX - dragStartX;
@@ -1084,6 +1183,11 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const onPointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") touchPointers.delete(event.pointerId);
+    if (pointerPinchLayer) {
+      if (touchPointers.size < 2) endPointerPinch();
+      return;
+    }
     if (event.pointerId !== draggingPointerId) return;
     const releasedLayer = draggingLayer;
     const wasTap = Boolean(releasedLayer) && !dragMoved;
@@ -1109,6 +1213,18 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     if (event.pointerType !== "touch") setHoveredLayer(hitTestLayer(event.clientX, event.clientY));
   };
 
+  const onPointerCancel = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") touchPointers.delete(event.pointerId);
+    if (pointerPinchLayer) endPointerPinch();
+    if (event.pointerId !== draggingPointerId) return;
+    draggingLayer = null;
+    draggingPointerId = -1;
+    dragPending = false;
+    dragMoved = false;
+    delete document.documentElement.dataset.artDragging;
+    syncInteractionState();
+  };
+
   const onWheel = (event: WheelEvent): void => {
     if (resizingArtwork) {
       event.preventDefault();
@@ -1126,17 +1242,26 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       scheduleResizeEnd();
       scaleLayer(layer, layer.userScale * Math.exp(-event.deltaY * 0.006));
       setHoveredLayer(layer);
+    } else if (isPlateTarget(event.target) && Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.2) {
+      const width = Math.max(window.innerWidth, 1);
+      const aspect = width / Math.max(window.innerHeight, 1);
+      event.preventDefault();
+      layer.userOffsetX -= (event.deltaX / width) * aspect * 2;
+      constrainLayerToPage(layer);
+      syncManipulationDataset(layer);
+      setHoveredLayer(layer);
+      requestRender();
     }
   };
 
   const onDoubleClick = (event: MouseEvent): void => {
     if (isInterfaceTarget(event.target)) return;
-    const layer = hitTestLayer(event.clientX, event.clientY);
+    const layer = hoveredLayer ?? hitTestLayer(event.clientX, event.clientY);
     if (layer) resetLayer(layer);
   };
 
   const onGestureStart = (event: MagnifyGestureEvent): void => {
-    if (isInterfaceTarget(event.target)) return;
+    if (pointerPinchLayer || isInterfaceTarget(event.target) || !isPlateTarget(event.target)) return;
     gestureLayer = hitTestLayer(event.clientX || lastPointerX, event.clientY || lastPointerY);
     if (!gestureLayer) return;
     gestureStartScale = gestureLayer.userScale;
@@ -1158,6 +1283,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   };
 
   const onGestureEnd = (event: Event): void => {
+    if (!gestureLayer) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     gestureLayer = null;
@@ -1191,10 +1317,14 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
     }
   };
 
+  const layoutObserver = new ResizeObserver(onResize);
+  layoutObserver.observe(stage);
+  layoutObserver.observe(options.plateElement);
+
   window.addEventListener("pointerdown", onPointerDown, { passive: false });
   window.addEventListener("pointermove", onPointerMove, { passive: false });
   window.addEventListener("pointerup", onPointerUp);
-  window.addEventListener("pointercancel", onPointerUp);
+  window.addEventListener("pointercancel", onPointerCancel);
   window.addEventListener("pointerleave", onPointerLeave);
   window.addEventListener("wheel", onWheel, { passive: false, capture: true });
   window.addEventListener("dblclick", onDoubleClick);
@@ -1203,6 +1333,7 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
   window.addEventListener("gesturechange", onGestureChange as EventListener, { passive: false, capture: true });
   window.addEventListener("gestureend", onGestureEnd as EventListener, { passive: false, capture: true });
   window.addEventListener("resize", onResize, { passive: true });
+  window.visualViewport?.addEventListener("resize", onResize, { passive: true });
   document.addEventListener("visibilitychange", onVisibilityChange);
   options.onStateChange(VISUAL_STATES[0]);
   void boot();
@@ -1238,12 +1369,14 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       if (resizeEndTimer !== 0) window.clearTimeout(resizeEndTimer);
       draggingLayer = null;
       dragPending = false;
+      pointerPinchLayer = null;
+      touchPointers.clear();
       setResizingArtwork(false);
       syncInteractionState();
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
       window.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("wheel", onWheel, true);
       window.removeEventListener("dblclick", onDoubleClick);
@@ -1252,6 +1385,8 @@ export function createVisual(container: HTMLElement, options: VisualOptions): Vi
       window.removeEventListener("gesturechange", onGestureChange as EventListener, true);
       window.removeEventListener("gestureend", onGestureEnd as EventListener, true);
       window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      layoutObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       subscriptions.forEach((unsubscribe) => unsubscribe());
       records.forEach((record) => {
