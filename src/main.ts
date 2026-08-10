@@ -138,7 +138,9 @@ window.addEventListener("pointermove", (event) => {
   if (pointerFrame) cancelAnimationFrame(pointerFrame);
   pointerFrame = requestAnimationFrame(() => {
     const x = event.clientX / Math.max(window.innerWidth, 1) - 0.5;
+    const y = event.clientY / Math.max(window.innerHeight, 1) - 0.5;
     site.style.setProperty("--pointer-x", x.toFixed(3));
+    site.style.setProperty("--pointer-y", y.toFixed(3));
   });
 }, { passive: true });
 
