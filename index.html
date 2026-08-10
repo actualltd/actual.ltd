@@ -72,7 +72,7 @@
   </head>
   <body>
     <main class="site" id="site" data-ready="false" data-switching="false">
-      <div class="visual" aria-hidden="true">
+      <div class="visual">
         <div class="background-parallax" id="background-parallax">
           <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
           <div class="dither-motion" id="dither-motion">
@@ -81,7 +81,7 @@
           </div>
         </div>
         <div class="animal-parallax" id="animal-parallax">
-          <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
+          <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="animal-dialog" aria-expanded="false" />
         </div>
       </div>
 
@@ -129,6 +129,32 @@
         <div class="company-dialog__footer">
           <span>ACTUAL.LTD</span>
           <span>BANGKOK / TH</span>
+        </div>
+      </dialog>
+
+      <dialog class="animal-dialog" id="animal-dialog" aria-labelledby="animal-title">
+        <div class="animal-card">
+          <figure class="animal-card__media">
+            <img id="animal-card-image" alt="" decoding="async" />
+            <figcaption><span id="animal-card-index">#000</span><span>ALT / PLATE</span></figcaption>
+          </figure>
+          <div class="animal-card__content">
+            <div class="animal-card__header">
+              <span>SPECIES / FIELD NOTE</span>
+              <button class="animal-close" id="animal-close" type="button" aria-label="Close animal details">CLOSE ×</button>
+            </div>
+            <div class="animal-card__title">
+              <h2 id="animal-title">ARABIAN ORYX</h2>
+              <p id="animal-scientific"><i>Oryx leucoryx</i></p>
+            </div>
+            <p class="animal-card__note" id="animal-note"></p>
+            <dl class="animal-card__facts">
+              <div><dt>RANGE</dt><dd id="animal-range"></dd></div>
+              <div><dt>HABITAT</dt><dd id="animal-habitat"></dd></div>
+              <div><dt>STATUS</dt><dd id="animal-status"></dd></div>
+            </dl>
+            <a class="animal-source" id="animal-source" href="#" target="_blank" rel="noreferrer">REFERENCE ↗</a>
+          </div>
         </div>
       </dialog>
 

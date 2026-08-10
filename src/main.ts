@@ -18,9 +18,16 @@ type Scene = {
   portrait: string;
   landscape: string;
   animal: string;
+  cardImage: string;
   label: string;
   name: string;
   description: string;
+  scientific: string;
+  range: string;
+  habitat: string;
+  status: string;
+  note: string;
+  source: string;
 };
 
 type SceneWindow = Window & { __ACTUAL_SCENE__?: number };
@@ -30,41 +37,76 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-01-oryx.png",
     landscape: "/animals/posters/landscape-01-oryx.png",
     animal: "/animals/posters/cutout-01-oryx.png",
+    cardImage: "/animals/01-oryx.webp",
     label: "ORYX",
     name: "Walking oryx",
     description: "An Arabian oryx walking with its head turned away against vivid cobalt blue.",
+    scientific: "Oryx leucoryx",
+    range: "Arabian Peninsula",
+    habitat: "Desert and arid steppe",
+    status: "Vulnerable / IUCN",
+    note: "Extinct in the wild by 1972, the Arabian oryx returned through coordinated captive breeding and reintroduction programs.",
+    source: "https://nc.iucnredlist.org/redlist/amazing-species/oryx-leucoryx/pdfs/original/oryx-leucoryx.pdf",
   },
   {
     portrait: "/animals/posters/portrait-02-crane.png",
     landscape: "/animals/posters/landscape-02-crane.png",
     animal: "/animals/posters/cutout-02-crane.png",
+    cardImage: "/animals/02-crane.webp",
     label: "CRANE",
     name: "Landing crane",
     description: "A red-crowned crane landing with its head turned away against vivid vermilion.",
+    scientific: "Grus japonensis",
+    range: "Temperate East Asia",
+    habitat: "Large wetlands, rivers and marshes",
+    status: "Vulnerable / IUCN",
+    note: "Two principal populations remain: a migratory mainland population and a resident population on Hokkaido, Japan.",
+    source: "https://savingcranes.org/species/red-crowned-crane/",
   },
   {
     portrait: "/animals/posters/portrait-03-stag.png",
     landscape: "/animals/posters/landscape-03-stag.png",
     animal: "/animals/posters/cutout-03-stag.png",
+    cardImage: "/animals/03-stag.webp",
     label: "STAG",
     name: "White stag",
     description: "A white stag seen from behind against vivid ultraviolet.",
+    scientific: "Cervus elaphus",
+    range: "Europe, North Africa and western Asia",
+    habitat: "Woodland, forest edge and open uplands",
+    status: "Least concern / IUCN",
+    note: "A red-deer stag renews its branching antlers each year, using them during the autumn rut.",
+    source: "https://animaldiversity.org/accounts/Cervus_elaphus/",
   },
   {
     portrait: "/animals/posters/portrait-04-tiger.png",
     landscape: "/animals/posters/landscape-04-tiger.png",
     animal: "/animals/posters/cutout-04-tiger.png",
+    cardImage: "/animals/04-tiger.webp",
     label: "TIGER",
     name: "Stretching tiger",
     description: "A Bengal tiger stretching with its face concealed against vivid emerald.",
+    scientific: "Panthera tigris tigris",
+    range: "Indian subcontinent",
+    habitat: "Forest, grassland and mangrove",
+    status: "Endangered / IUCN",
+    note: "Tigers have lost more than 93% of their historic range; habitat loss and illegal killing remain major threats.",
+    source: "https://nc.iucnredlist.org/redlist/amazing-species/panthera-tigris/pdfs/original/panthera-tigris.pdf",
   },
   {
     portrait: "/animals/posters/portrait-05-sailfish.png",
     landscape: "/animals/posters/landscape-05-sailfish.png",
     animal: "/animals/posters/cutout-05-sailfish.png",
+    cardImage: "/animals/05-sailfish.webp",
     label: "SAILFISH",
     name: "Swimming sailfish",
     description: "A sailfish swimming out of frame against vivid saffron.",
+    scientific: "Istiophorus platypterus",
+    range: "Tropical and subtropical oceans",
+    habitat: "Pelagic water near the surface",
+    status: "Least concern / IUCN",
+    note: "Satellite-tagged sailfish frequently cross national waters, making regional cooperation central to their management.",
+    source: "https://www.fisheries.noaa.gov/inport/item/26518",
   },
 ];
 
@@ -99,6 +141,17 @@ const companyRecord = requireElement<HTMLElement>(".company-record");
 const companyControl = requireElement<HTMLButtonElement>("#company-control");
 const companyDialog = requireElement<HTMLDialogElement>("#company-dialog");
 const companyClose = requireElement<HTMLButtonElement>("#company-close");
+const animalDialog = requireElement<HTMLDialogElement>("#animal-dialog");
+const animalClose = requireElement<HTMLButtonElement>("#animal-close");
+const animalCardImage = requireElement<HTMLImageElement>("#animal-card-image");
+const animalCardIndex = requireElement<HTMLElement>("#animal-card-index");
+const animalTitle = requireElement<HTMLElement>("#animal-title");
+const animalScientific = requireElement<HTMLElement>("#animal-scientific");
+const animalRange = requireElement<HTMLElement>("#animal-range");
+const animalHabitat = requireElement<HTMLElement>("#animal-habitat");
+const animalStatus = requireElement<HTMLElement>("#animal-status");
+const animalNote = requireElement<HTMLElement>("#animal-note");
+const animalSource = requireElement<HTMLAnchorElement>("#animal-source");
 const visualDescription = requireElement<HTMLElement>("#visual-description");
 const ditherLayers = Array.from(document.querySelectorAll<HTMLElement>(".dither-layer"));
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -112,6 +165,7 @@ let sceneRequest = 0;
 let sceneDeck: number[] = [];
 let transitioning = false;
 let companyClosing = false;
+let animalClosing = false;
 let idleAnimation: AnimationPlaybackControls | null = null;
 let ditherAnimations: AnimationPlaybackControls[] = [];
 
@@ -331,7 +385,26 @@ function applyScene(index: number, background: string): void {
   sceneName.textContent = scene.label;
   visualDescription.textContent = scene.description;
   sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
+  heroAnimal.setAttribute("aria-label", `Open details about the ${scene.label.toLowerCase()}`);
+  populateAnimalCard(scene, index);
   rememberScene(index);
+}
+
+function populateAnimalCard(scene: Scene, index: number): void {
+  animalCardImage.src = scene.cardImage;
+  animalCardImage.alt = `Alternate illustrated plate of the ${scene.label.toLowerCase()}`;
+  animalCardIndex.textContent = `#${String(index).padStart(3, "0")}`;
+  animalTitle.textContent = scene.label === "ORYX" ? "ARABIAN ORYX"
+    : scene.label === "CRANE" ? "RED-CROWNED CRANE"
+      : scene.label === "STAG" ? "RED DEER"
+        : scene.label === "TIGER" ? "BENGAL TIGER"
+          : "SAILFISH";
+  animalScientific.textContent = scene.scientific;
+  animalRange.textContent = scene.range;
+  animalHabitat.textContent = scene.habitat;
+  animalStatus.textContent = scene.status;
+  animalNote.textContent = scene.note;
+  animalSource.href = scene.source;
 }
 
 async function renderScene(index: number, initial = false): Promise<void> {
@@ -383,6 +456,63 @@ function nextScene(): number {
 
 sceneControl.addEventListener("click", () => {
   void renderScene(nextScene());
+});
+
+function openAnimalDialog(): void {
+  if (animalDialog.open || animalClosing || transitioning) return;
+  populateAnimalCard(scenes[currentScene], currentScene);
+  stopIdleMotion();
+  animalDialog.showModal();
+  heroAnimal.setAttribute("aria-expanded", "true");
+  if (reducedMotion.matches) {
+    animalDialog.style.opacity = "1";
+    return;
+  }
+  animate(animalDialog, { opacity: [0, 1] }, { duration: 0.3, ease });
+  animate(animalDialog.querySelector(".animal-card")!, {
+    opacity: [0, 1],
+    y: [34, 0],
+    scale: [0.985, 1],
+    clipPath: ["inset(5% 0 0 0)", "inset(0% 0 0 0)"],
+  }, { duration: 0.62, ease });
+}
+
+async function closeAnimalDialog(): Promise<void> {
+  if (!animalDialog.open || animalClosing) return;
+  animalClosing = true;
+  if (!reducedMotion.matches) {
+    await animate(animalDialog.querySelector(".animal-card")!, {
+      opacity: [1, 0],
+      y: [0, 24],
+      scale: [1, 0.992],
+    }, { duration: 0.26, ease: [0.7, 0, 0.84, 0] }).finished;
+  }
+  animalDialog.close();
+}
+
+heroAnimal.addEventListener("click", openAnimalDialog);
+heroAnimal.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  openAnimalDialog();
+});
+animalClose.addEventListener("click", () => { void closeAnimalDialog(); });
+animalDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  void closeAnimalDialog();
+});
+animalDialog.addEventListener("click", (event) => {
+  if (event.target !== animalDialog) return;
+  const bounds = animalDialog.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) void closeAnimalDialog();
+});
+animalDialog.addEventListener("close", () => {
+  animalClosing = false;
+  heroAnimal.setAttribute("aria-expanded", "false");
+  animalDialog.style.opacity = "0";
+  startIdleMotion(currentScene);
 });
 
 function openCompanyDialog(): void {
