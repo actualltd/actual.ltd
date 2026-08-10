@@ -104,7 +104,7 @@ html[data-scene="4"] .animal{bottom:0;left:-9vw;width:min(82vw,88rem)}
 html[data-scene="1"] .animal-card__media img{object-position:100% center}
 html[data-scene="2"] .animal-card__media img,html[data-scene="4"] .animal-card__media img{object-position:0 center}
 .animal-card__media figcaption{position:absolute;right:1rem;bottom:1rem;left:1rem;display:flex;justify-content:space-between;padding-top:.75rem;border-top:1px solid currentColor;color:#fff;font:650 .58rem/1 "Geist Mono Variable",monospace;letter-spacing:.075em;mix-blend-mode:difference}
-.animal-card__content{display:grid;grid-template-rows:repeat(5,auto);align-content:start;min-width:0;padding:1.1rem;overflow:auto;color:#fff;font-family:"Geist Mono Variable",monospace;text-transform:uppercase;mix-blend-mode:difference}
+.animal-card__content{display:grid;grid-template-rows:auto auto auto auto minmax(2.5rem,1fr);align-content:stretch;min-width:0;padding:1.1rem;overflow:auto;color:#fff;font-family:"Geist Mono Variable",monospace;text-transform:uppercase;mix-blend-mode:difference}
 .animal-card__header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:1rem;border-bottom:1px solid rgba(20,20,20,.2);font-size:.58rem;font-weight:650;line-height:1;letter-spacing:.075em}
 .animal-card__title{padding:1.5rem 0}
 .animal-card h2{max-width:9ch;margin:0;font-family:"Geist Variable",sans-serif;font-size:clamp(3.4rem,6.2vw,6.7rem);font-weight:570;line-height:.78;letter-spacing:-.075em}
@@ -115,7 +115,7 @@ html[data-scene="2"] .animal-card__media img,html[data-scene="4"] .animal-card__
 .animal-card__facts dt,.animal-card__facts dd{margin:0;font-size:.59rem;font-weight:650;line-height:1.4;letter-spacing:.06em}
 .animal-card__facts dt{opacity:.45}
 .animal-card__facts dd{text-align:right}
-.animal-source{justify-self:start;margin-top:1rem;color:inherit;font-size:.58rem;font-weight:650;line-height:1;letter-spacing:.075em;text-decoration:none;border-bottom:1px solid currentColor}
+.animal-source{align-self:end;justify-self:stretch;margin-top:1rem;padding-top:.8rem;color:inherit;font-size:.58rem;font-weight:650;line-height:1;letter-spacing:.075em;text-decoration:none;border-top:1px solid rgba(20,20,20,.2)}
 
 button:focus-visible,a:focus-visible{outline:1px solid currentColor;outline-offset:4px}
 .scene-control:focus-visible{outline:0;border-bottom-width:2px}
