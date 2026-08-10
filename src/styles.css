@@ -36,8 +36,8 @@ button{font:inherit}
 .visual,.background-parallax,.animal-parallax,.poster-background,.noscript-image{position:absolute;inset:0;width:100%;height:100%}
 .visual{z-index:0;overflow:hidden;background:var(--paper)}
 .background-parallax{z-index:0;clip-path:inset(0);will-change:transform,clip-path}
-.animal-parallax{z-index:2;will-change:transform,filter;pointer-events:none;transition:filter .42s var(--ease)}
-.animal-parallax[data-hit="true"],.animal-parallax:has(.animal:focus-visible){filter:drop-shadow(0 0 .55rem var(--glow)) drop-shadow(0 0 1.85rem color-mix(in srgb,var(--glow) 74%,transparent)) brightness(1.09) saturate(1.08)}
+.animal-parallax{z-index:2;will-change:transform,filter;pointer-events:none;transition:filter .2s var(--ease)}
+.animal-parallax[data-hit="true"],.animal-parallax:has(.animal:focus-visible){filter:drop-shadow(0 0 .16rem #fff) drop-shadow(0 0 .65rem color-mix(in srgb,var(--glow) 72%,#fff)) drop-shadow(0 0 1.9rem color-mix(in srgb,var(--glow) 84%,transparent)) brightness(1.1) saturate(1.1)}
 .poster-background,.noscript-image{z-index:0;display:block;object-fit:cover;object-position:center;user-select:none;-webkit-user-drag:none}
 .poster-background{transform:scale(1.035);will-change:opacity,filter}
 .dither-motion{position:absolute;z-index:1;inset:0;overflow:hidden;mix-blend-mode:soft-light;pointer-events:none;-webkit-mask-image:linear-gradient(to bottom,transparent 16%,#000 27%,#000 46%,transparent 58%);mask-image:linear-gradient(to bottom,transparent 16%,#000 27%,#000 46%,transparent 58%)}

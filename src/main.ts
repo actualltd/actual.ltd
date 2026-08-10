@@ -172,6 +172,7 @@ let idleAnimation: AnimationPlaybackControls | null = null;
 let ditherAnimations: AnimationPlaybackControls[] = [];
 const animalHitCanvas = document.createElement("canvas");
 const animalHitContext = animalHitCanvas.getContext("2d", { willReadFrequently: true });
+const ANIMAL_HIT_ALPHA_THRESHOLD = 48;
 let animalAlphaData: Uint8ClampedArray | null = null;
 let animalAlphaWidth = 0;
 let animalAlphaHeight = 0;
@@ -227,7 +228,7 @@ function isOpaqueAnimalPixel(event: MouseEvent | PointerEvent): boolean {
   const x = Math.floor(event.offsetX / renderedWidth * animalAlphaWidth);
   const y = Math.floor(event.offsetY / renderedHeight * animalAlphaHeight);
   if (x < 0 || x >= animalAlphaWidth || y < 0 || y >= animalAlphaHeight) return false;
-  return animalAlphaData[(y * animalAlphaWidth + x) * 4 + 3] >= 48;
+  return animalAlphaData[(y * animalAlphaWidth + x) * 4 + 3] >= ANIMAL_HIT_ALPHA_THRESHOLD;
 }
 
 function stopIdleMotion(): void {
