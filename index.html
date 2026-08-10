@@ -21,11 +21,11 @@
       document.documentElement.className = "has-js";
       (() => {
         const files = [
-          "/animals/01-oryx.webp",
-          "/animals/02-crane.webp",
-          "/animals/03-stag.webp",
-          "/animals/04-tiger.webp",
-          "/animals/05-sailfish.webp"
+          ["/animals/posters/portrait-01-oryx.png", "/animals/posters/landscape-01-oryx.png", "/animals/posters/cutout-01-oryx.png"],
+          ["/animals/posters/portrait-02-crane.png", "/animals/posters/landscape-02-crane.png", "/animals/posters/cutout-02-crane.png"],
+          ["/animals/posters/portrait-03-stag.png", "/animals/posters/landscape-03-stag.png", "/animals/posters/cutout-03-stag.png"],
+          ["/animals/posters/portrait-04-tiger.png", "/animals/posters/landscape-04-tiger.png", "/animals/posters/cutout-04-tiger.png"],
+          ["/animals/posters/portrait-05-sailfish.png", "/animals/posters/landscape-05-sailfish.png", "/animals/posters/cutout-05-sailfish.png"]
         ];
         let previous = -1;
         try {
@@ -42,11 +42,14 @@
         const selected = choices[random] ?? 0;
         window.__ACTUAL_SCENE__ = selected;
         document.documentElement.dataset.scene = String(selected);
-        const preload = document.createElement("link");
-        preload.rel = "preload";
-        preload.as = "image";
-        preload.href = files[selected];
-        document.head.append(preload);
+        const portrait = matchMedia("(max-aspect-ratio: 4/5)").matches;
+        [files[selected][portrait ? 0 : 1], files[selected][2]].forEach((href) => {
+          const preload = document.createElement("link");
+          preload.rel = "preload";
+          preload.as = "image";
+          preload.href = href;
+          document.head.append(preload);
+        });
       })();
     </script>
     <script type="application/ld+json">
@@ -70,20 +73,22 @@
   <body>
     <main class="site" id="site" data-ready="false" data-switching="false">
       <div class="visual" aria-hidden="true">
-        <img id="hero-image" width="1536" height="1024" alt="" decoding="async" fetchpriority="high" />
+        <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
+        <div class="wordmark">ACTUAL</div>
+        <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
       </div>
 
       <button class="scene-control" id="scene-control" type="button" aria-label="Show another animal">
         <span id="scene-index">01</span> / 05
       </button>
 
-      <h1 class="wordmark">ACTUAL</h1>
+      <h1 class="visually-hidden">ACTUAL</h1>
 
       <a class="contact" href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
       <p class="visually-hidden" id="visual-description" aria-live="polite"></p>
 
       <noscript>
-        <img class="noscript-image" src="/animals/01-oryx.webp" alt="An Arabian oryx walking in side profile" />
+        <img class="noscript-image" src="/animals/posters/portrait-01-oryx.png" alt="An Arabian oryx walking with its head turned away" />
         <style>.visual{display:none}.noscript-image{display:block}.site{opacity:1}</style>
       </noscript>
     </main>

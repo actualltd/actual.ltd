@@ -7,7 +7,9 @@ function requireElement<T extends HTMLElement>(selector: string): T {
 }
 
 type Scene = {
-  src: string;
+  portrait: string;
+  landscape: string;
+  animal: string;
   name: string;
   description: string;
 };
@@ -16,38 +18,50 @@ type SceneWindow = Window & { __ACTUAL_SCENE__?: number };
 
 const scenes: readonly Scene[] = [
   {
-    src: "/animals/01-oryx.webp",
+    portrait: "/animals/posters/portrait-01-oryx.png",
+    landscape: "/animals/posters/landscape-01-oryx.png",
+    animal: "/animals/posters/cutout-01-oryx.png",
     name: "Walking oryx",
     description: "An Arabian oryx walking with its head turned away against vivid cobalt blue.",
   },
   {
-    src: "/animals/02-crane.webp",
+    portrait: "/animals/posters/portrait-02-crane.png",
+    landscape: "/animals/posters/landscape-02-crane.png",
+    animal: "/animals/posters/cutout-02-crane.png",
     name: "Landing crane",
     description: "A red-crowned crane landing with its head turned away against vivid vermilion.",
   },
   {
-    src: "/animals/03-stag.webp",
+    portrait: "/animals/posters/portrait-03-stag.png",
+    landscape: "/animals/posters/landscape-03-stag.png",
+    animal: "/animals/posters/cutout-03-stag.png",
     name: "White stag",
     description: "A white stag seen from behind against vivid ultraviolet.",
   },
   {
-    src: "/animals/04-tiger.webp",
+    portrait: "/animals/posters/portrait-04-tiger.png",
+    landscape: "/animals/posters/landscape-04-tiger.png",
+    animal: "/animals/posters/cutout-04-tiger.png",
     name: "Stretching tiger",
     description: "A Bengal tiger stretching with its face concealed against vivid emerald.",
   },
   {
-    src: "/animals/05-sailfish.webp",
+    portrait: "/animals/posters/portrait-05-sailfish.png",
+    landscape: "/animals/posters/landscape-05-sailfish.png",
+    animal: "/animals/posters/cutout-05-sailfish.png",
     name: "Swimming sailfish",
     description: "A sailfish swimming out of frame against vivid saffron.",
   },
 ];
 
 const site = requireElement<HTMLElement>("#site");
-const heroImage = requireElement<HTMLImageElement>("#hero-image");
+const heroBackground = requireElement<HTMLImageElement>("#hero-background");
+const heroAnimal = requireElement<HTMLImageElement>("#hero-animal");
 const sceneControl = requireElement<HTMLButtonElement>("#scene-control");
 const sceneIndex = requireElement<HTMLElement>("#scene-index");
 const visualDescription = requireElement<HTMLElement>("#visual-description");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const portraitLayout = window.matchMedia("(max-aspect-ratio: 4/5)");
 
 let currentScene = Math.min(
   scenes.length - 1,
@@ -61,15 +75,30 @@ function rememberScene(index: number): void {
   try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
 }
 
+function backgroundFor(scene: Scene): string {
+  return portraitLayout.matches ? scene.portrait : scene.landscape;
+}
+
+function preload(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(), { once: true });
+    image.addEventListener("error", () => reject(new Error(`Unable to load ${src}`)), { once: true });
+    image.src = src;
+  });
+}
+
 function renderScene(index: number, initial = false): void {
   const request = ++sceneRequest;
   const scene = scenes[index];
+  const background = backgroundFor(scene);
   const apply = () => {
     if (request !== sceneRequest) return;
     currentScene = index;
     document.documentElement.dataset.scene = String(index);
-    heroImage.src = scene.src;
-    heroImage.alt = scene.description;
+    heroBackground.src = background;
+    heroAnimal.src = scene.animal;
+    heroAnimal.alt = scene.description;
     sceneIndex.textContent = String(index + 1).padStart(2, "0");
     visualDescription.textContent = scene.description;
     sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
@@ -80,24 +109,14 @@ function renderScene(index: number, initial = false): void {
     });
   };
 
-  if (initial) {
-    heroImage.addEventListener("load", apply, { once: true });
-    heroImage.src = scene.src;
-    if (heroImage.complete && heroImage.naturalWidth > 0) apply();
-    return;
-  }
-
-  site.dataset.switching = "true";
+  if (!initial) site.dataset.switching = "true";
   window.clearTimeout(switchTimer);
-  const preloader = new Image();
-  preloader.src = scene.src;
-  preloader.addEventListener("load", () => {
+  Promise.all([preload(background), preload(scene.animal)]).then(() => {
     if (request !== sceneRequest) return;
-    switchTimer = window.setTimeout(apply, reducedMotion.matches ? 0 : 180);
-  }, { once: true });
-  preloader.addEventListener("error", () => {
+    switchTimer = window.setTimeout(apply, initial || reducedMotion.matches ? 0 : 180);
+  }).catch(() => {
     if (request === sceneRequest) site.dataset.switching = "false";
-  }, { once: true });
+  });
 }
 
 function randomScene(exclude: number): number {
@@ -119,11 +138,11 @@ window.addEventListener("pointermove", (event) => {
   if (pointerFrame) cancelAnimationFrame(pointerFrame);
   pointerFrame = requestAnimationFrame(() => {
     const x = event.clientX / Math.max(window.innerWidth, 1) - 0.5;
-    const y = event.clientY / Math.max(window.innerHeight, 1) - 0.5;
     site.style.setProperty("--pointer-x", x.toFixed(3));
-    site.style.setProperty("--pointer-y", y.toFixed(3));
   });
 }, { passive: true });
+
+portraitLayout.addEventListener("change", () => renderScene(currentScene));
 
 renderScene(currentScene, true);
 window.setTimeout(() => { site.dataset.ready = "true"; }, 1200);
