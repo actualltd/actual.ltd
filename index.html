@@ -1,21 +1,54 @@
 <!doctype html>
-<html lang="en" class="no-js">
+<html lang="en" class="no-js" data-scene="0">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#33483d" />
-    <meta name="description" content="Actual Ltd. — an independent company in Bangkok, Thailand." />
+    <meta name="theme-color" content="#3155d5" />
+    <meta name="description" content="Official website of ACTUAL LTD." />
     <link rel="canonical" href="https://actual.ltd/" />
-    <link rel="preload" as="image" href="/animal.webp" type="image/webp" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="ACTUAL LTD." />
-    <meta property="og:description" content="Independent company. Bangkok, Thailand." />
+    <meta property="og:title" content="ACTUAL" />
+    <meta property="og:description" content="ACTUAL" />
     <meta property="og:url" content="https://actual.ltd/" />
     <meta property="og:image" content="https://actual.ltd/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ACTUAL" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://actual.ltd/og.png" />
-    <title>ACTUAL LTD.</title>
-    <script>document.documentElement.className="has-js";</script>
+    <title>ACTUAL</title>
+    <script>
+      document.documentElement.className = "has-js";
+      (() => {
+        const files = [
+          "/animals/01-gazelle.webp",
+          "/animals/02-unicorn.webp",
+          "/animals/03-stag.webp",
+          "/animals/04-jackalope.webp",
+          "/animals/05-pegasus.webp"
+        ];
+        let previous = -1;
+        try {
+          const saved = sessionStorage.getItem("actual-scene");
+          previous = saved === null ? -1 : Number(saved);
+        } catch {}
+        const choices = [0, 1, 2, 3, 4].filter((value) => value !== previous);
+        let random = Math.floor(Math.random() * choices.length);
+        if (window.crypto && window.crypto.getRandomValues) {
+          const entropy = new Uint32Array(1);
+          window.crypto.getRandomValues(entropy);
+          random = entropy[0] % choices.length;
+        }
+        const selected = choices[random] ?? 0;
+        window.__ACTUAL_SCENE__ = selected;
+        document.documentElement.dataset.scene = String(selected);
+        const preload = document.createElement("link");
+        preload.rel = "preload";
+        preload.as = "image";
+        preload.href = files[selected];
+        document.head.append(preload);
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,73 +68,23 @@
     </script>
   </head>
   <body>
-    <a class="skip-link" href="#intro">Skip to content</a>
+    <main class="site" id="site" data-ready="false" data-switching="false">
+      <div class="visual" aria-hidden="true">
+        <img id="hero-image" width="1536" height="1024" alt="" decoding="async" fetchpriority="high" />
+      </div>
 
-    <main class="site" id="site" data-ready="false">
-      <div class="grain" aria-hidden="true"></div>
+      <button class="scene-control" id="scene-control" type="button" aria-label="Show another animal">
+        <span id="scene-index">01</span> / 05
+      </button>
 
-      <header class="header">
-        <a class="brand" href="#home" aria-label="Actual Ltd. home">
-          <span class="brand__mark" aria-hidden="true"></span>
-          <span>ACTUAL LTD.</span>
-        </a>
-        <p class="location">BANGKOK, TH<br /><span id="local-time">ICT · UTC+7</span></p>
-        <button class="info-button" id="info-button" type="button" aria-haspopup="dialog" aria-controls="company-dialog" aria-expanded="false">
-          <span>COMPANY</span><span aria-hidden="true">↗</span>
-        </button>
-      </header>
+      <h1 class="wordmark">ACTUAL</h1>
 
-      <section class="hero" id="home" aria-labelledby="hero-title">
-        <div class="intro" id="intro">
-          <p class="eyebrow"><span>01</span> INDEPENDENT COMPANY</p>
-          <p class="statement">Quietly building<br />what matters.</p>
-        </div>
-
-        <h1 class="wordmark" id="hero-title">
-          <span>ACTUAL</span>
-          <small>LTD.</small>
-        </h1>
-
-        <figure class="animal" id="animal">
-          <div class="animal__halo" aria-hidden="true"></div>
-          <img
-            src="/animal.webp"
-            width="920"
-            height="1109"
-            alt="A resting gazelle curled away from view"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </figure>
-
-        <p class="status"><span class="status__dot" aria-hidden="true"></span>CURRENT WORK / PRIVATE</p>
-      </section>
-
-      <footer class="footer">
-        <p>© <span id="year">2026</span> ACTUAL LTD.</p>
-        <a href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD <span aria-hidden="true">↗</span></a>
-      </footer>
-
-      <dialog class="company-dialog" id="company-dialog" aria-labelledby="company-title">
-        <div class="company-dialog__bar">
-          <span>COMPANY / 01</span>
-          <button id="company-close" type="button" aria-label="Close company details">CLOSE ×</button>
-        </div>
-        <div class="company-dialog__body">
-          <div>
-            <p class="dialog-kicker">ACTUAL LTD.</p>
-            <h2 id="company-title">Independent,<br />by design.</h2>
-          </div>
-          <dl>
-            <div><dt>STATUS</dt><dd>CURRENT WORK / PRIVATE</dd></div>
-            <div><dt>REGISTERED OFFICE</dt><dd>25 Chidlom, Ploenchit<br />Lumpini, Patumwan<br />Bangkok 10330, Thailand</dd></div>
-            <div><dt>CONTACT</dt><dd><a href="mailto:hello@actual.ltd">hello@actual.ltd</a></dd></div>
-          </dl>
-        </div>
-      </dialog>
+      <a class="contact" href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
+      <p class="visually-hidden" id="visual-description" aria-live="polite"></p>
 
       <noscript>
-        <style>.site{opacity:1!important}.animal{transform:none!important}</style>
+        <img class="noscript-image" src="/animals/01-gazelle.webp" alt="A celestial gazelle curled away from view" />
+        <style>.visual{display:none}.noscript-image{display:block}.site{opacity:1}</style>
       </noscript>
     </main>
 

@@ -6,73 +6,132 @@ function requireElement<T extends HTMLElement>(selector: string): T {
   return element;
 }
 
+type Scene = {
+  src: string;
+  name: string;
+  description: string;
+  theme: string;
+};
+
+type SceneWindow = Window & { __ACTUAL_SCENE__?: number };
+
+const scenes: readonly Scene[] = [
+  {
+    src: "/animals/01-gazelle.webp",
+    name: "Celestial gazelle",
+    description: "A celestial gazelle curled away from view against vivid cobalt blue.",
+    theme: "#3155d5",
+  },
+  {
+    src: "/animals/02-unicorn.webp",
+    name: "Resting unicorn",
+    description: "A resting unicorn with its face concealed by its mane against vivid vermilion.",
+    theme: "#e34b37",
+  },
+  {
+    src: "/animals/03-stag.webp",
+    name: "White stag",
+    description: "A white stag seen from behind against vivid ultraviolet.",
+    theme: "#6c49ce",
+  },
+  {
+    src: "/animals/04-jackalope.webp",
+    name: "Sleeping jackalope",
+    description: "A sleeping jackalope curled away from view against vivid emerald.",
+    theme: "#129768",
+  },
+  {
+    src: "/animals/05-pegasus.webp",
+    name: "Dark pegasus",
+    description: "A dark pegasus hiding its face behind folded wings against vivid saffron.",
+    theme: "#f2a51a",
+  },
+];
+
 const site = requireElement<HTMLElement>("#site");
-const animal = requireElement<HTMLElement>("#animal");
-const animalImage = requireElement<HTMLImageElement>("#animal img");
-const infoButton = requireElement<HTMLButtonElement>("#info-button");
-const companyDialog = requireElement<HTMLDialogElement>("#company-dialog");
-const companyClose = requireElement<HTMLButtonElement>("#company-close");
-const year = requireElement<HTMLElement>("#year");
-const localTime = requireElement<HTMLElement>("#local-time");
+const heroImage = requireElement<HTMLImageElement>("#hero-image");
+const sceneControl = requireElement<HTMLButtonElement>("#scene-control");
+const sceneIndex = requireElement<HTMLElement>("#scene-index");
+const visualDescription = requireElement<HTMLElement>("#visual-description");
+const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-function markReady(): void {
-  site.dataset.ready = "true";
+let currentScene = Math.min(
+  scenes.length - 1,
+  Math.max(0, (window as SceneWindow).__ACTUAL_SCENE__ ?? 0),
+);
+let switchTimer = 0;
+let pointerFrame = 0;
+let sceneRequest = 0;
+
+function rememberScene(index: number): void {
+  try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
 }
 
-if (animalImage.complete) markReady();
-else animalImage.addEventListener("load", markReady, { once: true });
-window.setTimeout(markReady, 800);
+function renderScene(index: number, initial = false): void {
+  const request = ++sceneRequest;
+  const scene = scenes[index];
+  const apply = () => {
+    if (request !== sceneRequest) return;
+    currentScene = index;
+    document.documentElement.dataset.scene = String(index);
+    themeColor?.setAttribute("content", scene.theme);
+    heroImage.src = scene.src;
+    heroImage.alt = scene.description;
+    sceneIndex.textContent = String(index + 1).padStart(2, "0");
+    visualDescription.textContent = scene.description;
+    sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
+    rememberScene(index);
+    requestAnimationFrame(() => {
+      site.dataset.ready = "true";
+      site.dataset.switching = "false";
+    });
+  };
 
-year.textContent = String(new Date().getFullYear());
+  if (initial) {
+    heroImage.addEventListener("load", apply, { once: true });
+    heroImage.src = scene.src;
+    if (heroImage.complete && heroImage.naturalWidth > 0) apply();
+    return;
+  }
 
-function updateBangkokTime(): void {
-  const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Bangkok",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
-  localTime.textContent = `${time} ICT`;
+  site.dataset.switching = "true";
+  window.clearTimeout(switchTimer);
+  const preloader = new Image();
+  preloader.src = scene.src;
+  preloader.addEventListener("load", () => {
+    if (request !== sceneRequest) return;
+    switchTimer = window.setTimeout(apply, reducedMotion.matches ? 0 : 180);
+  }, { once: true });
+  preloader.addEventListener("error", () => {
+    if (request === sceneRequest) site.dataset.switching = "false";
+  }, { once: true });
 }
 
-updateBangkokTime();
-window.setInterval(updateBangkokTime, 30_000);
+function randomScene(exclude: number): number {
+  const choices = scenes.map((_, index) => index).filter((index) => index !== exclude);
+  if (window.crypto?.getRandomValues) {
+    const entropy = new Uint32Array(1);
+    window.crypto.getRandomValues(entropy);
+    return choices[entropy[0] % choices.length];
+  }
+  return choices[Math.floor(Math.random() * choices.length)];
+}
 
-let animationFrame = 0;
+sceneControl.addEventListener("click", () => {
+  renderScene(randomScene(currentScene));
+});
 
 window.addEventListener("pointermove", (event) => {
   if (reducedMotion.matches || event.pointerType === "touch") return;
-  if (animationFrame) cancelAnimationFrame(animationFrame);
-  animationFrame = requestAnimationFrame(() => {
-    const x = (event.clientX / Math.max(window.innerWidth, 1) - 0.5) * 2;
-    const y = (event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2;
-    animal.style.setProperty("--pointer-x", x.toFixed(3));
-    animal.style.setProperty("--pointer-y", y.toFixed(3));
+  if (pointerFrame) cancelAnimationFrame(pointerFrame);
+  pointerFrame = requestAnimationFrame(() => {
+    const x = event.clientX / Math.max(window.innerWidth, 1) - 0.5;
+    const y = event.clientY / Math.max(window.innerHeight, 1) - 0.5;
+    site.style.setProperty("--pointer-x", x.toFixed(3));
+    site.style.setProperty("--pointer-y", y.toFixed(3));
   });
 }, { passive: true });
 
-function openCompany(): void {
-  companyDialog.showModal();
-  infoButton.setAttribute("aria-expanded", "true");
-}
-
-function closeCompany(restoreFocus = true): void {
-  companyDialog.close();
-  infoButton.setAttribute("aria-expanded", "false");
-  if (restoreFocus) infoButton.focus();
-}
-
-infoButton.addEventListener("click", openCompany);
-companyClose.addEventListener("click", () => closeCompany());
-companyDialog.addEventListener("click", (event) => {
-  if (event.target === companyDialog) closeCompany();
-});
-companyDialog.addEventListener("cancel", (event) => {
-  event.preventDefault();
-  closeCompany();
-});
-
-window.addEventListener("pagehide", () => {
-  if (companyDialog.open) closeCompany(false);
-});
+renderScene(currentScene, true);
+window.setTimeout(() => { site.dataset.ready = "true"; }, 1200);
