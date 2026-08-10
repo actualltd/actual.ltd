@@ -1,5 +1,12 @@
 import "./styles.css";
-import { animate, stagger, type AnimationPlaybackControls } from "motion";
+import {
+  animate,
+  motionValue,
+  springValue,
+  stagger,
+  styleEffect,
+  type AnimationPlaybackControls,
+} from "motion";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -80,12 +87,18 @@ const idleProfiles: readonly IdleProfile[] = [
 const ease = [0.16, 1, 0.3, 1] as const;
 
 const site = requireElement<HTMLElement>("#site");
+const backgroundParallax = requireElement<HTMLElement>("#background-parallax");
+const animalParallax = requireElement<HTMLElement>("#animal-parallax");
 const heroBackground = requireElement<HTMLImageElement>("#hero-background");
 const heroAnimal = requireElement<HTMLImageElement>("#hero-animal");
+const wordmark = requireElement<HTMLElement>(".wordmark");
 const sceneControl = requireElement<HTMLButtonElement>("#scene-control");
 const sceneIndex = requireElement<HTMLElement>("#scene-index");
 const sceneName = requireElement<HTMLElement>("#scene-name");
 const companyRecord = requireElement<HTMLElement>(".company-record");
+const companyControl = requireElement<HTMLButtonElement>("#company-control");
+const companyDialog = requireElement<HTMLDialogElement>("#company-dialog");
+const companyClose = requireElement<HTMLButtonElement>("#company-close");
 const visualDescription = requireElement<HTMLElement>("#visual-description");
 const ditherLayers = Array.from(document.querySelectorAll<HTMLElement>(".dither-layer"));
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -98,6 +111,7 @@ let currentScene = Math.min(
 let sceneRequest = 0;
 let sceneDeck: number[] = [];
 let transitioning = false;
+let companyClosing = false;
 let idleAnimation: AnimationPlaybackControls | null = null;
 let ditherAnimations: AnimationPlaybackControls[] = [];
 
@@ -161,6 +175,50 @@ function startDitherMotion(): void {
       backgroundPosition: ["2px 1px", "-5px 6px", "4px -3px"],
     }, { duration: 8.2, ease: "linear", repeat: Number.POSITIVE_INFINITY }));
   }
+}
+
+function initialiseParallax(): void {
+  if (reducedMotion.matches) return;
+
+  const targetX = motionValue(0);
+  const targetY = motionValue(0);
+  const springOptions = { stiffness: 92, damping: 22, mass: 0.42 };
+
+  const backgroundX = springValue<number>(0, springOptions);
+  const backgroundY = springValue<number>(0, springOptions);
+  const animalX = springValue<number>(0, springOptions);
+  const animalY = springValue<number>(0, springOptions);
+  const wordmarkX = springValue<number>(0, springOptions);
+  const wordmarkY = springValue<number>(0, springOptions);
+
+  styleEffect(backgroundParallax, { x: backgroundX, y: backgroundY });
+  styleEffect(animalParallax, { x: animalX, y: animalY });
+  styleEffect(wordmark, { x: wordmarkX, y: wordmarkY });
+
+  const updateDepth = (): void => {
+    const x = targetX.get();
+    const y = targetY.get();
+    backgroundX.set(x * -14);
+    backgroundY.set(y * -8);
+    animalX.set(x * 52);
+    animalY.set(y * 30);
+    wordmarkX.set(x * 24);
+    wordmarkY.set(y * 14);
+  };
+
+  targetX.on("change", updateDepth);
+  targetY.on("change", updateDepth);
+
+  window.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch") return;
+    targetX.set(event.clientX / Math.max(window.innerWidth, 1) - 0.5);
+    targetY.set(event.clientY / Math.max(window.innerHeight, 1) - 0.5);
+  }, { passive: true });
+
+  document.documentElement.addEventListener("pointerleave", () => {
+    targetX.set(0);
+    targetY.set(0);
+  });
 }
 
 async function runInitialEntrance(): Promise<void> {
@@ -324,6 +382,53 @@ sceneControl.addEventListener("click", () => {
   void renderScene(nextScene());
 });
 
+function openCompanyDialog(): void {
+  if (companyDialog.open || companyClosing) return;
+  companyDialog.showModal();
+  companyControl.setAttribute("aria-expanded", "true");
+  if (reducedMotion.matches) {
+    companyDialog.style.opacity = "1";
+    return;
+  }
+  animate(companyDialog, {
+    opacity: [0, 1],
+    y: [32, 0],
+    scale: [0.985, 1],
+  }, { duration: 0.52, ease });
+}
+
+async function closeCompanyDialog(): Promise<void> {
+  if (!companyDialog.open || companyClosing) return;
+  companyClosing = true;
+  if (!reducedMotion.matches) {
+    await animate(companyDialog, {
+      opacity: [1, 0],
+      y: [0, 22],
+      scale: [1, 0.99],
+    }, { duration: 0.28, ease: [0.7, 0, 0.84, 0] }).finished;
+  }
+  companyDialog.close();
+}
+
+companyControl.addEventListener("click", openCompanyDialog);
+companyClose.addEventListener("click", () => { void closeCompanyDialog(); });
+companyDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  void closeCompanyDialog();
+});
+companyDialog.addEventListener("click", (event) => {
+  if (event.target !== companyDialog) return;
+  const bounds = companyDialog.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) void closeCompanyDialog();
+});
+companyDialog.addEventListener("close", () => {
+  companyClosing = false;
+  companyControl.setAttribute("aria-expanded", "false");
+  companyDialog.style.opacity = "0";
+});
+
 portraitLayout.addEventListener("change", () => {
   const background = backgroundFor(scenes[currentScene]);
   void preload(background).then(() => {
@@ -344,4 +449,5 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+initialiseParallax();
 void renderScene(currentScene, true);

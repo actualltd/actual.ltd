@@ -73,12 +73,16 @@
   <body>
     <main class="site" id="site" data-ready="false" data-switching="false">
       <div class="visual" aria-hidden="true">
-        <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
-        <div class="dither-motion" id="dither-motion">
-          <span class="dither-layer dither-layer-a"></span>
-          <span class="dither-layer dither-layer-b"></span>
+        <div class="background-parallax" id="background-parallax">
+          <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
+          <div class="dither-motion" id="dither-motion">
+            <span class="dither-layer dither-layer-a"></span>
+            <span class="dither-layer dither-layer-b"></span>
+          </div>
         </div>
-        <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
+        <div class="animal-parallax" id="animal-parallax">
+          <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
+        </div>
       </div>
 
       <div class="top-overlay">
@@ -92,8 +96,8 @@
       <div class="bottom-overlay">
         <div class="wordmark" aria-hidden="true"><span class="wordmark-letter">A</span><span class="wordmark-letter">C</span><span class="wordmark-letter">T</span><span class="wordmark-letter">U</span><span class="wordmark-letter">A</span><span class="wordmark-letter">L</span></div>
         <div class="company-record" aria-label="ACTUAL company information">
-          <span>BANGKOK</span>
-          <span>THAILAND</span>
+          <button class="company-control" id="company-control" type="button" aria-haspopup="dialog" aria-controls="company-dialog" aria-expanded="false">COMPANY ↗</button>
+          <span>BANGKOK / TH</span>
           <a class="contact" href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
         </div>
       </div>
@@ -101,6 +105,32 @@
       <h1 class="visually-hidden">ACTUAL</h1>
 
       <p class="visually-hidden" id="visual-description" aria-live="polite"></p>
+
+      <dialog class="company-dialog" id="company-dialog" aria-labelledby="company-title">
+        <div class="company-dialog__header">
+          <span class="company-dialog__eyebrow">LEGAL ENTITY / COMPANY RECORD</span>
+          <button class="company-close" id="company-close" type="button" aria-label="Close company information">CLOSE ×</button>
+        </div>
+        <div class="company-dialog__body">
+          <h2 id="company-title">ACTUAL LTD.</h2>
+          <div class="company-field">
+            <span class="company-field__label">REGISTERED OFFICE</span>
+            <address>
+              25 CHIDLOM, PLOENCHIT<br />
+              LUMPINI, PATUMWAN<br />
+              BANGKOK 10330, THAILAND
+            </address>
+          </div>
+          <div class="company-field">
+            <span class="company-field__label">CONTACT</span>
+            <a href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
+          </div>
+        </div>
+        <div class="company-dialog__footer">
+          <span>ACTUAL.LTD</span>
+          <span>BANGKOK / TH</span>
+        </div>
+      </dialog>
 
       <noscript>
         <img class="noscript-image" src="/animals/posters/portrait-01-oryx.png" alt="An Arabian oryx walking with its head turned away" />
