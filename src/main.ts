@@ -228,20 +228,23 @@ async function runInitialEntrance(): Promise<void> {
     return;
   }
 
-  const backgroundEntrance = animate(heroBackground, {
+  const backgroundReveal = animate(backgroundParallax, {
+    clipPath: ["inset(0 0 100% 0)", "inset(0 0 0% 0)"],
+  }, { duration: 1.55, ease });
+  const backgroundTone = animate(heroBackground, {
     opacity: [0, 1],
-    filter: ["saturate(.72) contrast(.94)", "saturate(1) contrast(1)"],
-  }, { duration: 1.15, ease });
+    filter: ["saturate(.58) contrast(.9) brightness(1.08)", "saturate(1) contrast(1) brightness(1)"],
+  }, { duration: 1.4, ease });
   const animalEntrance = animate(heroAnimal, {
     opacity: [0, 1],
     y: [42, 0],
     scale: [0.975, 1],
     clipPath: ["inset(100% 0 0 0)", "inset(0% 0 0 0)"],
-  }, { duration: 1.25, delay: 0.12, ease });
+  }, { duration: 1.25, delay: 0.38, ease });
   animate(".wordmark-letter", {
     opacity: [0, 1],
     y: ["38%", "0%"],
-  }, { duration: 0.9, delay: stagger(0.045, { startDelay: 0.22 }), ease });
+  }, { duration: 0.9, delay: stagger(0.045, { startDelay: 0.46 }), ease });
   animate(sceneControl, {
     clipPath: ["inset(0 100% 0 0)", "inset(0 0% 0 0)"],
   }, { duration: 0.95, delay: 0.18, ease });
@@ -258,7 +261,7 @@ async function runInitialEntrance(): Promise<void> {
   }, { duration: 0.7, delay: stagger(0.055, { startDelay: 0.52 }), ease });
 
   startDitherMotion();
-  await Promise.all([backgroundEntrance.finished, animalEntrance.finished]);
+  await Promise.all([backgroundReveal.finished, backgroundTone.finished, animalEntrance.finished]);
   startIdleMotion(currentScene);
 }
 

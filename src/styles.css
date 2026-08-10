@@ -32,8 +32,8 @@ button{font:inherit}
 .site{position:fixed;inset:0;width:100%;height:100svh;min-height:32rem;overflow:hidden;isolation:isolate;background:var(--background);color:var(--ink);opacity:0;transition:background-color .35s ease,color .35s ease,opacity .55s ease}
 .site[data-ready="true"]{opacity:1}
 .visual,.background-parallax,.animal-parallax,.poster-background,.noscript-image{position:absolute;inset:0;width:100%;height:100%}
-.visual{z-index:0;overflow:hidden;background:var(--background)}
-.background-parallax{z-index:0;will-change:transform}
+.visual{z-index:0;overflow:hidden;background:var(--paper)}
+.background-parallax{z-index:0;clip-path:inset(0);will-change:transform,clip-path}
 .animal-parallax{z-index:2;will-change:transform;pointer-events:none}
 .poster-background,.noscript-image{z-index:0;display:block;object-fit:cover;object-position:center;user-select:none;-webkit-user-drag:none}
 .poster-background{transform:scale(1.035);will-change:opacity,filter}
