@@ -70,6 +70,7 @@ let currentScene = Math.min(
 let switchTimer = 0;
 let pointerFrame = 0;
 let sceneRequest = 0;
+let sceneDeck: number[] = [];
 
 function rememberScene(index: number): void {
   try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
@@ -119,18 +120,30 @@ function renderScene(index: number, initial = false): void {
   });
 }
 
-function randomScene(exclude: number): number {
-  const choices = scenes.map((_, index) => index).filter((index) => index !== exclude);
+function randomIndex(length: number): number {
   if (window.crypto?.getRandomValues) {
     const entropy = new Uint32Array(1);
     window.crypto.getRandomValues(entropy);
-    return choices[entropy[0] % choices.length];
+    return entropy[0] % length;
   }
-  return choices[Math.floor(Math.random() * choices.length)];
+  return Math.floor(Math.random() * length);
+}
+
+function refillSceneDeck(exclude: number): void {
+  sceneDeck = scenes.map((_, index) => index).filter((index) => index !== exclude);
+  for (let index = sceneDeck.length - 1; index > 0; index -= 1) {
+    const swap = randomIndex(index + 1);
+    [sceneDeck[index], sceneDeck[swap]] = [sceneDeck[swap], sceneDeck[index]];
+  }
+}
+
+function nextScene(): number {
+  if (sceneDeck.length === 0) refillSceneDeck(currentScene);
+  return sceneDeck.shift() ?? currentScene;
 }
 
 sceneControl.addEventListener("click", () => {
-  renderScene(randomScene(currentScene));
+  renderScene(nextScene());
 });
 
 window.addEventListener("pointermove", (event) => {
