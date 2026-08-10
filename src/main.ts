@@ -17,33 +17,33 @@ type SceneWindow = Window & { __ACTUAL_SCENE__?: number };
 
 const scenes: readonly Scene[] = [
   {
-    src: "/animals/01-gazelle.webp",
-    name: "Celestial gazelle",
-    description: "A celestial gazelle curled away from view against vivid cobalt blue.",
+    src: "/animals/01-oryx.webp",
+    name: "Walking oryx",
+    description: "An Arabian oryx walking in side profile against vivid cobalt blue.",
     theme: "#3155d5",
   },
   {
-    src: "/animals/02-unicorn.webp",
-    name: "Resting unicorn",
-    description: "A resting unicorn with its face concealed by its mane against vivid vermilion.",
+    src: "/animals/02-crane.webp",
+    name: "Landing crane",
+    description: "A red-crowned crane descending to land against vivid vermilion.",
     theme: "#e34b37",
   },
   {
-    src: "/animals/03-stag.webp",
-    name: "White stag",
-    description: "A white stag seen from behind against vivid ultraviolet.",
+    src: "/animals/03-manta.webp",
+    name: "Banking manta",
+    description: "A manta ray banking through water against vivid ultraviolet.",
     theme: "#6c49ce",
   },
   {
-    src: "/animals/04-jackalope.webp",
-    name: "Sleeping jackalope",
-    description: "A sleeping jackalope curled away from view against vivid emerald.",
+    src: "/animals/04-tiger.webp",
+    name: "Stretching tiger",
+    description: "A Bengal tiger stretching naturally against vivid emerald.",
     theme: "#129768",
   },
   {
-    src: "/animals/05-pegasus.webp",
-    name: "Dark pegasus",
-    description: "A dark pegasus hiding its face behind folded wings against vivid saffron.",
+    src: "/animals/05-sailfish.webp",
+    name: "Swimming sailfish",
+    description: "A sailfish swimming in side profile against vivid saffron.",
     theme: "#f2a51a",
   },
 ];

@@ -51,7 +51,7 @@ button:focus-visible,a:focus-visible{outline:1px solid currentColor;outline-offs
   .site{min-height:36rem}
   .wordmark{bottom:2rem;font-size:25.2vw;line-height:.7}
   .scene-control,.contact{font-size:.54rem}
-  .visual img,.noscript-image{transform:translate3d(0,0,0) scale(1.012)}
+  .visual img,.noscript-image{object-fit:contain;transform:translate3d(0,0,0) scale(1.012)}
 }
 
 @media(max-height:620px) and (min-width:761px){
