@@ -19,31 +19,31 @@ const scenes: readonly Scene[] = [
   {
     src: "/animals/01-oryx.webp",
     name: "Walking oryx",
-    description: "An Arabian oryx walking in side profile against vivid cobalt blue.",
+    description: "An Arabian oryx walking with its head turned away against vivid cobalt blue.",
     theme: "#3155d5",
   },
   {
     src: "/animals/02-crane.webp",
     name: "Landing crane",
-    description: "A red-crowned crane descending to land against vivid vermilion.",
+    description: "A red-crowned crane landing with its head turned away against vivid vermilion.",
     theme: "#e34b37",
   },
   {
-    src: "/animals/03-manta.webp",
-    name: "Banking manta",
-    description: "A manta ray banking through water against vivid ultraviolet.",
+    src: "/animals/03-stag.webp",
+    name: "White stag",
+    description: "A white stag seen from behind against vivid ultraviolet.",
     theme: "#6c49ce",
   },
   {
     src: "/animals/04-tiger.webp",
     name: "Stretching tiger",
-    description: "A Bengal tiger stretching naturally against vivid emerald.",
+    description: "A Bengal tiger stretching with its face concealed against vivid emerald.",
     theme: "#129768",
   },
   {
     src: "/animals/05-sailfish.webp",
     name: "Swimming sailfish",
-    description: "A sailfish swimming in side profile against vivid saffron.",
+    description: "A sailfish swimming out of frame against vivid saffron.",
     theme: "#f2a51a",
   },
 ];
