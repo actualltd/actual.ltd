@@ -22,6 +22,15 @@ if (!transitionMatch || Number(transitionMatch[1]) > 0.25) {
   failures.push("Animal glow must reach full brightness within 250ms.");
 }
 
+const restingRule = styles.match(/\.animal-parallax\{([^}]*)\}/)?.[1] ?? "";
+const glowClearDefinitions = styles.match(/--glow-clear:/g)?.length ?? 0;
+if (!restingRule.includes("rgb(255 255 255 / 0)") || (restingRule.match(/var\(--glow-clear\)/g)?.length ?? 0) < 2) {
+  failures.push("Animal glow must start from an explicit color-preserving transparent shadow stack, never filter:none.");
+}
+if (glowClearDefinitions !== 6) {
+  failures.push("Every scene and the default palette need a transparent version of their glow color.");
+}
+
 if (failures.length) throw new Error(failures.join("\n"));
 
-console.log(`Animal hover keeps its alpha threshold at ${threshold} and always renders a fast, bright inner halo.`);
+console.log(`Animal hover keeps its alpha threshold at ${threshold} and transitions directly through its scene glow color.`);
