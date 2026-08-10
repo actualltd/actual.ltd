@@ -1,21 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#eee8dc" />
-    <meta name="description" content="Official website of ACTUAL LTD." />
+    <meta name="theme-color" content="#33483d" />
+    <meta name="description" content="Actual Ltd. — an independent company in Bangkok, Thailand." />
     <link rel="canonical" href="https://actual.ltd/" />
+    <link rel="preload" as="image" href="/animal.webp" type="image/webp" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="ACTUAL LTD." />
-    <meta property="og:description" content="Official website of ACTUAL LTD." />
+    <meta property="og:description" content="Independent company. Bangkok, Thailand." />
     <meta property="og:url" content="https://actual.ltd/" />
     <meta property="og:image" content="https://actual.ltd/og.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="ACTUAL LTD." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://actual.ltd/og.png" />
     <title>ACTUAL LTD.</title>
+    <script>document.documentElement.className="has-js";</script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,203 +35,76 @@
     </script>
   </head>
   <body>
-    <main class="site-shell" aria-label="ACTUAL company page">
-      <div class="visual-layer" id="visual-layer" aria-hidden="true">
-        <div class="visual-fallback"></div>
-      </div>
+    <a class="skip-link" href="#intro">Skip to content</a>
 
-      <header class="masthead">
-        <div class="record-meta" role="group" aria-label="Visual record">
-          <span id="record-index">[001/003]</span>
-          <span id="record-label">FORM</span>
-          <span class="density-ramp" aria-hidden="true">.:-=+*#%@</span>
-        </div>
-        <div class="view-controls" role="group" aria-label="Artwork and sound controls">
-          <button class="view-control" id="view-control" type="button" aria-pressed="false" aria-label="Show full-color artwork">
-            VIEW—DITHER
-          </button>
-          <button class="motion-control" id="motion-control" type="button" aria-pressed="true">
-            MOTION—ON
-          </button>
-          <div class="sound-control" id="sound-control" data-state="off">
-            <button
-              class="sound-toggle"
-              id="sound-toggle"
-              type="button"
-              aria-pressed="false"
-              aria-controls="sound-level"
-            >
-              SOUND—OFF
-            </button>
-            <label class="sound-level" id="sound-level-control" for="sound-level">
-              <span class="visually-hidden">Music volume</span>
-              <input id="sound-level" type="range" min="0" max="60" step="1" value="18" />
-              <output id="sound-output" for="sound-level">18</output>
-            </label>
-          </div>
-        </div>
+    <main class="site" id="site" data-ready="false">
+      <div class="grain" aria-hidden="true"></div>
+
+      <header class="header">
+        <a class="brand" href="#home" aria-label="Actual Ltd. home">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span>ACTUAL LTD.</span>
+        </a>
+        <p class="location">BANGKOK, TH<br /><span id="local-time">ICT · UTC+7</span></p>
+        <button class="info-button" id="info-button" type="button" aria-haspopup="dialog" aria-controls="company-dialog" aria-expanded="false">
+          <span>COMPANY</span><span aria-hidden="true">↗</span>
+        </button>
       </header>
 
-      <h1 class="visually-hidden">ACTUAL LTD.</h1>
+      <section class="hero" id="home" aria-labelledby="hero-title">
+        <div class="intro" id="intro">
+          <p class="eyebrow"><span>01</span> INDEPENDENT COMPANY</p>
+          <p class="statement">Quietly building<br />what matters.</p>
+        </div>
 
-      <section class="identity" aria-label="Artwork record" aria-live="polite">
-        <div class="art-plate" aria-hidden="true">
-          <span class="art-interaction-surface" id="art-interaction-surface"></span>
-          <i class="crop-mark crop-mark-nw"></i>
-          <i class="crop-mark crop-mark-ne"></i>
-          <i class="crop-mark crop-mark-sw"></i>
-          <i class="crop-mark crop-mark-se"></i>
-          <span class="plate-axis plate-axis-x"></span>
-          <span class="plate-axis plate-axis-y"></span>
-          <span class="plate-note">ACT / 03</span>
-          <span class="plate-gesture">SWIPE / DRAG / PINCH / TAP</span>
-        </div>
-        <div class="scene-copy">
-          <span class="scene-step" id="scene-step">001 / FORM</span>
-          <span class="scene-line" id="scene-line">PAINTING / STATUE / VESSEL</span>
-          <span class="scene-caption">
-            <span id="scene-title">THE DEATH OF SOCRATES</span>
-            <span id="scene-artist">JACQUES LOUIS DAVID — 1787</span>
-          </span>
-        </div>
+        <h1 class="wordmark" id="hero-title">
+          <span>ACTUAL</span>
+          <small>LTD.</small>
+        </h1>
+
+        <figure class="animal" id="animal">
+          <div class="animal__halo" aria-hidden="true"></div>
+          <img
+            src="/animal.webp"
+            width="920"
+            height="1109"
+            alt="A resting gazelle curled away from view"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </figure>
+
+        <p class="status"><span class="status__dot" aria-hidden="true"></span>CURRENT WORK / PRIVATE</p>
       </section>
 
-      <div class="scroll-cue" aria-hidden="true">
-        <span class="scroll-label scroll-label-desktop">SCROLL</span>
-        <span class="scroll-label scroll-label-touch">SWIPE</span>
-        <span class="scroll-rule"></span>
-        <span class="scroll-index" id="scroll-index">002</span>
-      </div>
-
       <footer class="footer">
-        <div class="edition">
-          <button
-            class="actual-mark"
-            id="company-control"
-            type="button"
-            aria-haspopup="dialog"
-            aria-controls="company-dialog"
-            aria-expanded="false"
-          >
-            <span>ACTUAL LTD.</span>
-          </button>
-          <button
-            class="credits-control"
-            id="credits-control"
-            type="button"
-            aria-haspopup="dialog"
-            aria-controls="credits-dialog"
-            aria-expanded="false"
-          >
-            <span>CREDITS</span>
-            <span class="credits-control__count" aria-label="3 artworks">/ 03</span>
-          </button>
-        </div>
-        <a class="email" href="mailto:hello@actual.ltd">
-          <span>hello@actual.ltd</span><span class="email-arrow" aria-hidden="true">↗</span>
-        </a>
+        <p>© <span id="year">2026</span> ACTUAL LTD.</p>
+        <a href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD <span aria-hidden="true">↗</span></a>
       </footer>
 
       <dialog class="company-dialog" id="company-dialog" aria-labelledby="company-title">
-        <div class="company-dialog__header">
-          <div>
-            <span class="company-dialog__eyebrow">LEGAL ENTITY / COMPANY RECORD</span>
-            <h2 id="company-title">ACTUAL LTD.</h2>
-          </div>
-          <button class="company-close" id="company-close" type="button" aria-label="Close company information">
-            CLOSE—×
-          </button>
+        <div class="company-dialog__bar">
+          <span>COMPANY / 01</span>
+          <button id="company-close" type="button" aria-label="Close company details">CLOSE ×</button>
         </div>
         <div class="company-dialog__body">
-          <div class="company-field">
-            <span class="company-field__label">REGISTERED OFFICE</span>
-            <address>
-              25 CHIDLOM, PLOENCHIT<br />
-              LUMPINI, PATUMWAN<br />
-              BANGKOK 10330, THAILAND
-            </address>
-          </div>
-          <div class="company-field">
-            <span class="company-field__label">CONTACT</span>
-            <a href="mailto:hello@actual.ltd">hello@actual.ltd <span aria-hidden="true">↗</span></a>
-          </div>
-        </div>
-        <div class="company-dialog__footer">
-          <span>ACTUAL.LTD</span>
-          <span>BANGKOK / TH</span>
-        </div>
-      </dialog>
-
-      <dialog class="credits-dialog" id="credits-dialog" aria-labelledby="credits-title">
-        <div class="credits-dialog__header">
           <div>
-            <span class="credits-dialog__eyebrow">COLLECTION</span>
-            <h2 id="credits-title">ARTWORK INDEX</h2>
+            <p class="dialog-kicker">ACTUAL LTD.</p>
+            <h2 id="company-title">Independent,<br />by design.</h2>
           </div>
-          <button class="credits-close" id="credits-close" type="button" aria-label="Close artwork index">
-            CLOSE—×
-          </button>
-        </div>
-        <div class="credits-dialog__chapter">
-          <span id="credits-chapter">001 / FORM</span>
-          <span>03 PUBLIC-DOMAIN WORKS</span>
-        </div>
-        <ol class="credits-list" id="credits-list" aria-label="Artworks in this record"></ol>
-        <div class="credits-dialog__footer">
-          <span>THE MET / OPEN ACCESS</span>
-          <span>CC0</span>
-        </div>
-      </dialog>
-
-      <dialog class="artwork-dialog" id="artwork-dialog" aria-labelledby="artwork-detail-title">
-        <div class="artwork-dialog__media">
-          <img id="artwork-detail-image" alt="" decoding="async" />
-        </div>
-        <aside class="artwork-dialog__details">
-          <div class="artwork-dialog__header">
-            <span id="artwork-detail-index">001 / ENVIRONMENT</span>
-            <button class="artwork-close" id="artwork-close" type="button" aria-label="Close artwork viewer">
-              CLOSE—×
-            </button>
-          </div>
-          <div class="artwork-dialog__title-block">
-            <span class="artwork-dialog__eyebrow">SOURCE</span>
-            <h2 id="artwork-detail-title">THE DEATH OF SOCRATES</h2>
-          </div>
-          <dl class="artwork-dialog__metadata">
-            <div>
-              <dt>ARTIST</dt>
-              <dd id="artwork-detail-artist">JACQUES LOUIS DAVID</dd>
-            </div>
-            <div>
-              <dt>DATE</dt>
-              <dd id="artwork-detail-date">1787</dd>
-            </div>
-            <div>
-              <dt>ROLE</dt>
-              <dd id="artwork-detail-role">ENVIRONMENT</dd>
-            </div>
+          <dl>
+            <div><dt>STATUS</dt><dd>CURRENT WORK / PRIVATE</dd></div>
+            <div><dt>REGISTERED OFFICE</dt><dd>25 Chidlom, Ploenchit<br />Lumpini, Patumwan<br />Bangkok 10330, Thailand</dd></div>
+            <div><dt>CONTACT</dt><dd><a href="mailto:hello@actual.ltd">hello@actual.ltd</a></dd></div>
           </dl>
-          <div class="artwork-dialog__source">
-            <span>PUBLIC DOMAIN / THE MET OPEN ACCESS</span>
-            <a id="artwork-detail-source" href="https://www.metmuseum.org/art/collection/search/436105" target="_blank" rel="noreferrer">
-              VIEW COLLECTION RECORD <span aria-hidden="true">↗</span>
-            </a>
-          </div>
-        </aside>
+        </div>
       </dialog>
 
       <noscript>
-        <style>
-          .motion-control, .view-control, .sound-control { display: none; }
-        </style>
+        <style>.site{opacity:1!important}.animal{transform:none!important}</style>
       </noscript>
     </main>
-    <div class="scroll-track" aria-hidden="true">
-      <div class="scroll-scene" data-scroll-scene></div>
-      <div class="scroll-scene" data-scroll-scene></div>
-      <div class="scroll-scene" data-scroll-scene></div>
-    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

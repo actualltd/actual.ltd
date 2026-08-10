@@ -18,6 +18,7 @@ function sitesMetadata(): Plugin {
 
 export default defineConfig({
   base: "/",
+  publicDir: "site-public",
   plugins: [
     sitesMetadata(),
     cloudflare({
