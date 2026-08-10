@@ -134,6 +134,8 @@ const animalParallax = requireElement<HTMLElement>("#animal-parallax");
 const heroBackground = requireElement<HTMLImageElement>("#hero-background");
 const heroAnimal = requireElement<HTMLImageElement>("#hero-animal");
 const wordmark = requireElement<HTMLElement>(".wordmark");
+const topMeta = requireElement<HTMLElement>("#top-meta");
+const sceneScientific = requireElement<HTMLElement>("#scene-scientific");
 const sceneControl = requireElement<HTMLButtonElement>("#scene-control");
 const sceneIndex = requireElement<HTMLElement>("#scene-index");
 const sceneName = requireElement<HTMLElement>("#scene-name");
@@ -302,6 +304,10 @@ async function runInitialEntrance(): Promise<void> {
   animate(sceneControl, {
     clipPath: ["inset(0 100% 0 0)", "inset(0 0% 0 0)"],
   }, { duration: 0.95, delay: 0.18, ease });
+  animate(topMeta, {
+    opacity: [0, 1],
+    y: [-8, 0],
+  }, { duration: 0.7, delay: 0.12, ease });
   animate(sceneControl.querySelectorAll("span"), {
     opacity: [0, 1],
     y: [-12, 0],
@@ -336,6 +342,10 @@ async function exitScene(): Promise<void> {
     opacity: [1, 0],
     y: [0, -10],
   }, { duration: 0.28, delay: stagger(0.025, { from: "last" }), ease: "easeIn" });
+  animate(sceneScientific, {
+    opacity: [1, 0],
+    y: [0, -7],
+  }, { duration: 0.24, ease: "easeIn" });
   animate(".wordmark-letter", {
     opacity: [1, 0.48],
     y: [0, 10],
@@ -365,6 +375,10 @@ async function enterScene(index: number): Promise<void> {
     opacity: [0, 1],
     y: [12, 0],
   }, { duration: 0.52, delay: stagger(0.055, { startDelay: 0.12 }), ease });
+  animate(sceneScientific, {
+    opacity: [0, 1],
+    y: [7, 0],
+  }, { duration: 0.48, delay: 0.08, ease });
   animate(".wordmark-letter", {
     opacity: [0.48, 1],
     y: [10, 0],
@@ -383,6 +397,7 @@ function applyScene(index: number, background: string): void {
   heroAnimal.alt = scene.description;
   sceneIndex.textContent = `#${String(index).padStart(3, "0")}`;
   sceneName.textContent = scene.label;
+  sceneScientific.textContent = scene.scientific;
   visualDescription.textContent = scene.description;
   sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
   heroAnimal.setAttribute("aria-label", `Open details about the ${scene.label.toLowerCase()}`);
