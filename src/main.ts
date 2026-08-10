@@ -170,6 +170,11 @@ let companyClosing = false;
 let animalClosing = false;
 let idleAnimation: AnimationPlaybackControls | null = null;
 let ditherAnimations: AnimationPlaybackControls[] = [];
+const animalHitCanvas = document.createElement("canvas");
+const animalHitContext = animalHitCanvas.getContext("2d", { willReadFrequently: true });
+let animalAlphaData: Uint8ClampedArray | null = null;
+let animalAlphaWidth = 0;
+let animalAlphaHeight = 0;
 
 function rememberScene(index: number): void {
   try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
@@ -186,6 +191,43 @@ function preload(src: string): Promise<void> {
     image.addEventListener("error", () => reject(new Error(`Unable to load ${src}`)), { once: true });
     image.src = src;
   });
+}
+
+function setAnimalHitState(active: boolean): void {
+  animalParallax.dataset.hit = active ? "true" : "false";
+}
+
+async function refreshAnimalHitMask(): Promise<void> {
+  const requestedSource = heroAnimal.src;
+  animalAlphaData = null;
+  setAnimalHitState(false);
+  if (!animalHitContext) return;
+
+  try {
+    await heroAnimal.decode();
+    if (heroAnimal.src !== requestedSource) return;
+    animalAlphaWidth = heroAnimal.naturalWidth;
+    animalAlphaHeight = heroAnimal.naturalHeight;
+    animalHitCanvas.width = animalAlphaWidth;
+    animalHitCanvas.height = animalAlphaHeight;
+    animalHitContext.clearRect(0, 0, animalAlphaWidth, animalAlphaHeight);
+    animalHitContext.drawImage(heroAnimal, 0, 0);
+    animalAlphaData = animalHitContext.getImageData(0, 0, animalAlphaWidth, animalAlphaHeight).data;
+  } catch {
+    animalAlphaData = null;
+  }
+}
+
+function isOpaqueAnimalPixel(event: MouseEvent | PointerEvent): boolean {
+  if (!animalAlphaData || !animalAlphaWidth || !animalAlphaHeight) return false;
+  const renderedWidth = heroAnimal.clientWidth;
+  const renderedHeight = heroAnimal.clientHeight;
+  if (!renderedWidth || !renderedHeight) return false;
+
+  const x = Math.floor(event.offsetX / renderedWidth * animalAlphaWidth);
+  const y = Math.floor(event.offsetY / renderedHeight * animalAlphaHeight);
+  if (x < 0 || x >= animalAlphaWidth || y < 0 || y >= animalAlphaHeight) return false;
+  return animalAlphaData[(y * animalAlphaWidth + x) * 4 + 3] >= 48;
 }
 
 function stopIdleMotion(): void {
@@ -394,6 +436,7 @@ function applyScene(index: number, background: string): void {
   document.documentElement.dataset.scene = String(index);
   heroBackground.src = background;
   heroAnimal.src = scene.animal;
+  void refreshAnimalHitMask();
   heroAnimal.alt = scene.description;
   sceneIndex.textContent = `#${String(index).padStart(3, "0")}`;
   sceneName.textContent = scene.label;
@@ -505,7 +548,14 @@ async function closeAnimalDialog(): Promise<void> {
   animalDialog.close();
 }
 
-heroAnimal.addEventListener("click", openAnimalDialog);
+heroAnimal.addEventListener("pointermove", (event) => {
+  if (event.pointerType === "touch") return;
+  setAnimalHitState(isOpaqueAnimalPixel(event));
+});
+heroAnimal.addEventListener("pointerleave", () => { setAnimalHitState(false); });
+heroAnimal.addEventListener("click", (event) => {
+  if (isOpaqueAnimalPixel(event)) openAnimalDialog();
+});
 heroAnimal.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();

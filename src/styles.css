@@ -37,14 +37,15 @@ button{font:inherit}
 .visual{z-index:0;overflow:hidden;background:var(--paper)}
 .background-parallax{z-index:0;clip-path:inset(0);will-change:transform,clip-path}
 .animal-parallax{z-index:2;will-change:transform,filter;pointer-events:none;transition:filter .42s var(--ease)}
-.animal-parallax:has(.animal:is(:hover,:focus-visible)){filter:drop-shadow(0 0 .55rem var(--glow)) drop-shadow(0 0 1.85rem color-mix(in srgb,var(--glow) 74%,transparent)) brightness(1.09) saturate(1.08)}
+.animal-parallax[data-hit="true"],.animal-parallax:has(.animal:focus-visible){filter:drop-shadow(0 0 .55rem var(--glow)) drop-shadow(0 0 1.85rem color-mix(in srgb,var(--glow) 74%,transparent)) brightness(1.09) saturate(1.08)}
 .poster-background,.noscript-image{z-index:0;display:block;object-fit:cover;object-position:center;user-select:none;-webkit-user-drag:none}
 .poster-background{transform:scale(1.035);will-change:opacity,filter}
 .dither-motion{position:absolute;z-index:1;inset:0;overflow:hidden;mix-blend-mode:soft-light;pointer-events:none;-webkit-mask-image:linear-gradient(to bottom,transparent 16%,#000 27%,#000 46%,transparent 58%);mask-image:linear-gradient(to bottom,transparent 16%,#000 27%,#000 46%,transparent 58%)}
 .dither-layer{position:absolute;inset:-8%;display:block;opacity:.12;background-repeat:repeat;image-rendering:pixelated;will-change:transform,opacity,background-position}
 .dither-layer-a{background-image:radial-gradient(circle,rgba(255,255,255,.9) 0 .7px,transparent .85px);background-size:4px 4px}
 .dither-layer-b{background-image:radial-gradient(circle,rgba(0,0,0,.72) 0 .65px,transparent .8px);background-position:2px 1px;background-size:5px 5px;mix-blend-mode:overlay}
-.animal{position:absolute;z-index:2;display:block;height:auto;max-width:none;transform-origin:center bottom;will-change:transform,opacity,filter,clip-path;pointer-events:auto;cursor:zoom-in;user-select:none;-webkit-user-drag:none}
+.animal{position:absolute;z-index:2;display:block;height:auto;max-width:none;transform-origin:center bottom;will-change:transform,opacity,filter,clip-path;pointer-events:auto;cursor:default;user-select:none;-webkit-user-drag:none}
+.animal-parallax[data-hit="true"] .animal{cursor:zoom-in}
 .animal:focus-visible{outline:0}
 .site[data-ready="false"] .animal,.site[data-switching="true"] .animal{pointer-events:none}
 .noscript-image{display:none}
