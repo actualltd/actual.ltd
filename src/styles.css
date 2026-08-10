@@ -47,7 +47,7 @@ button{font:inherit}
 .site[data-ready="false"] .animal,.site[data-switching="true"] .animal{pointer-events:none}
 .noscript-image{display:none}
 
-.top-overlay{position:absolute;z-index:4;top:0;right:0;left:0;height:clamp(8rem,24vh,14rem);color:#141414;pointer-events:none}
+.top-overlay{position:absolute;z-index:4;top:0;right:0;left:0;height:clamp(8rem,24vh,14rem);color:#fff;mix-blend-mode:difference;pointer-events:none}
 .bottom-overlay{position:absolute;z-index:3;right:0;bottom:0;left:0;height:clamp(13rem,34vh,24rem);color:#fff;mix-blend-mode:difference;pointer-events:none}
 .wordmark{position:absolute;right:var(--edge);bottom:calc(max(var(--edge),env(safe-area-inset-bottom)) + var(--rail-height) + clamp(.9rem,2vh,1.6rem));left:var(--edge);font-size:clamp(7rem,18.8vw,22rem);font-weight:570;line-height:.66;letter-spacing:-.087em;white-space:nowrap;opacity:.92;pointer-events:none}
 .wordmark-letter{display:inline-block;will-change:transform,opacity}
@@ -77,6 +77,7 @@ html[data-scene="4"] .animal{bottom:0;left:-9vw;width:min(82vw,88rem)}
 .company-dialog[open]{display:grid}
 .company-dialog::backdrop{background:rgba(15,15,15,.22);backdrop-filter:blur(3px)}
 .company-dialog__header,.company-dialog__footer{display:flex;align-items:flex-start;justify-content:space-between}
+.company-dialog__header,.company-dialog__body,.company-dialog__footer{color:#fff;mix-blend-mode:difference}
 .company-dialog__header{padding:1rem 1.1rem;border-bottom:1px solid rgba(20,20,20,.18)}
 .company-dialog__eyebrow,.company-dialog__footer,.company-field__label{font-size:.57rem;font-weight:620;line-height:1.35;letter-spacing:.085em}
 .company-close{justify-self:end}
@@ -95,7 +96,7 @@ html[data-scene="4"] .animal{bottom:0;left:-9vw;width:min(82vw,88rem)}
 .animal-card__media{position:relative;min-width:0;height:100%;margin:0;overflow:hidden;background:var(--background)}
 .animal-card__media img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-drag:none}
 .animal-card__media figcaption{position:absolute;right:1rem;bottom:1rem;left:1rem;display:flex;justify-content:space-between;padding-top:.75rem;border-top:1px solid currentColor;color:#fff;font:650 .58rem/1 "Geist Mono Variable",monospace;letter-spacing:.075em;mix-blend-mode:difference}
-.animal-card__content{display:grid;grid-template-rows:auto auto 1fr auto auto;min-width:0;padding:1.1rem;overflow:auto;font-family:"Geist Mono Variable",monospace;text-transform:uppercase}
+.animal-card__content{display:grid;grid-template-rows:auto auto 1fr auto auto;min-width:0;padding:1.1rem;overflow:auto;color:#fff;font-family:"Geist Mono Variable",monospace;text-transform:uppercase;mix-blend-mode:difference}
 .animal-card__header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:1rem;border-bottom:1px solid rgba(20,20,20,.2);font-size:.58rem;font-weight:650;line-height:1;letter-spacing:.075em}
 .animal-card__title{padding:1.5rem 0}
 .animal-card h2{max-width:9ch;margin:0;font-family:"Geist Variable",sans-serif;font-size:clamp(3.4rem,6.2vw,6.7rem);font-weight:570;line-height:.78;letter-spacing:-.075em}
