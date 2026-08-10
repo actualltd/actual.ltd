@@ -52,7 +52,7 @@ const scenes = [
   },
   {
     file: "04-tiger.webp", slug: "04-tiger", color: "05a159", pattern: "softgrain", cell: 1,
-    crop: { left: 18, top: 170, width: 1500, height: 800 }, supportY: 590, supportSpread: 1, greenGroundCleanupY: 620,
+    crop: { left: 18, top: 170, width: 1500, height: 800 }, greenGroundCleanupY: 620,
     palette: ["f2a33d", "f5e6c4", "152c28"],
   },
   {
