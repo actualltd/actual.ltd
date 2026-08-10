@@ -68,9 +68,12 @@ let currentScene = Math.min(
   Math.max(0, (window as SceneWindow).__ACTUAL_SCENE__ ?? 0),
 );
 let switchTimer = 0;
-let pointerFrame = 0;
 let sceneRequest = 0;
 let sceneDeck: number[] = [];
+let pointerTargetX = 0;
+let pointerTargetY = 0;
+let pointerX = 0;
+let pointerY = 0;
 
 function rememberScene(index: number): void {
   try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
@@ -147,17 +150,34 @@ sceneControl.addEventListener("click", () => {
 });
 
 window.addEventListener("pointermove", (event) => {
-  if (reducedMotion.matches || event.pointerType === "touch") return;
-  if (pointerFrame) cancelAnimationFrame(pointerFrame);
-  pointerFrame = requestAnimationFrame(() => {
-    const x = event.clientX / Math.max(window.innerWidth, 1) - 0.5;
-    const y = event.clientY / Math.max(window.innerHeight, 1) - 0.5;
-    site.style.setProperty("--pointer-x", x.toFixed(3));
-    site.style.setProperty("--pointer-y", y.toFixed(3));
-  });
+  if (reducedMotion.matches) return;
+  pointerTargetX = event.clientX / Math.max(window.innerWidth, 1) - 0.5;
+  pointerTargetY = event.clientY / Math.max(window.innerHeight, 1) - 0.5;
 }, { passive: true });
+
+document.documentElement.addEventListener("pointerleave", () => {
+  pointerTargetX = 0;
+  pointerTargetY = 0;
+});
+
+function animateParallax(time: number): void {
+  if (!reducedMotion.matches) {
+    pointerX += (pointerTargetX - pointerX) * 0.085;
+    pointerY += (pointerTargetY - pointerY) * 0.085;
+    const driftX = Math.sin(time * 0.00042) * 8 + Math.sin(time * 0.00091) * 2;
+    const driftY = Math.cos(time * 0.00036) * 5;
+    site.style.setProperty("--background-x", `${(-pointerX * 24 - driftX * 0.32).toFixed(2)}px`);
+    site.style.setProperty("--background-y", `${(-pointerY * 16 - driftY * 0.28).toFixed(2)}px`);
+    site.style.setProperty("--type-x", `${(pointerX * 20 + driftX * 0.55).toFixed(2)}px`);
+    site.style.setProperty("--type-y", `${(pointerY * 12 + driftY * 0.45).toFixed(2)}px`);
+    site.style.setProperty("--animal-x", `${(pointerX * 70 + driftX * 1.15).toFixed(2)}px`);
+    site.style.setProperty("--animal-y", `${(pointerY * 42 + driftY).toFixed(2)}px`);
+  }
+  requestAnimationFrame(animateParallax);
+}
 
 portraitLayout.addEventListener("change", () => renderScene(currentScene));
 
 renderScene(currentScene, true);
+requestAnimationFrame(animateParallax);
 window.setTimeout(() => { site.dataset.ready = "true"; }, 1200);

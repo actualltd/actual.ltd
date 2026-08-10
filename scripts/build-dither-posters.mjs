@@ -46,14 +46,13 @@ const scenes = [
     palette: ["f4ead3", "a9a08e", "242b2b"],
   },
   {
-    file: "03-stag.webp", slug: "03-stag", color: "6038c4", pattern: "cluster", cell: 3,
+    file: "03-stag.webp", slug: "03-stag", color: "6038c4", pattern: "micrograin", cell: 1,
     crop: { left: 280, top: 24, width: 980, height: 1000 },
     palette: ["fff0c9", "d9c8c5", "5d3aa5"],
   },
   {
-    file: "04-tiger.webp", slug: "04-tiger", color: "05a159", pattern: "diagonal", cell: 2,
-    crop: { left: 18, top: 170, width: 1500, height: 800 }, supportY: 590, supportSpread: 1, cutBottom: 728,
-    bottomContour: [[0, 716], [430, 716], [540, 675], [850, 675], [960, 710], [1160, 710], [1500, 720]],
+    file: "04-tiger.webp", slug: "04-tiger", color: "05a159", pattern: "softgrain", cell: 1,
+    crop: { left: 18, top: 170, width: 1500, height: 800 }, supportY: 590, supportSpread: 1, greenGroundCleanupY: 620,
     palette: ["f2a33d", "f5e6c4", "152c28"],
   },
   {
@@ -83,6 +82,12 @@ function patternThreshold(scene, x, y) {
   const py = Math.floor(y / scene.cell);
   if (scene.pattern === "cluster") return (cluster8[py % 8][px % 8] + 0.5) / 64;
   if (scene.pattern === "diagonal") return (((px + py * 3) % 16) + 0.5) / 16;
+  if (scene.pattern === "micrograin") return hashThreshold(px, py, 31);
+  if (scene.pattern === "softgrain") {
+    const fine = hashThreshold(px, py, 47);
+    const soft = hashThreshold(Math.floor(px / 5), Math.floor(py / 5), 53);
+    return Math.min(1, Math.max(0, fine * 0.82 + soft * 0.18));
+  }
   if (scene.pattern === "noise" || scene.pattern === "floyd") return hashThreshold(px, py, scenes.indexOf(scene) + 1);
   return (bayer8[py % 8][px % 8] + 0.5) / 64;
 }
@@ -213,6 +218,21 @@ function applySceneCleanup(alpha, width, height, scene) {
   }
 }
 
+function removeGreenGround(data, alpha, width, height, startY) {
+  if (startY === undefined) return;
+  for (let y = startY; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = y * width + x;
+      if (alpha[pixel] === 0) continue;
+      const offset = pixel * 4;
+      const red = data[offset];
+      const green = data[offset + 1];
+      const blue = data[offset + 2];
+      if (green > red * 1.35 && green > blue * 1.18) alpha[pixel] = 0;
+    }
+  }
+}
+
 function ditherAnimal(data, alpha, width, height, scene) {
   const palette = scene.palette.map(hexToRgb);
   for (let y = 0; y < height; y += 1) {
@@ -265,6 +285,7 @@ async function writeAnimalCutout(scene) {
 
   retainLargestComponent(alpha, info.width, info.height);
   removeUnsupportedGround(alpha, info.width, info.height, scene.supportY, scene.supportSpread ?? 4);
+  removeGreenGround(data, alpha, info.width, info.height, scene.greenGroundCleanupY);
   applySceneCleanup(alpha, info.width, info.height, scene);
   retainLargestComponent(alpha, info.width, info.height);
   ditherAnimal(data, alpha, info.width, info.height, scene);
