@@ -103,7 +103,7 @@ function renderScene(index: number, initial = false): void {
     heroBackground.src = background;
     heroAnimal.src = scene.animal;
     heroAnimal.alt = scene.description;
-    sceneIndex.textContent = String(index + 1).padStart(2, "0");
+    sceneIndex.textContent = `#${String(index).padStart(3, "0")}`;
     visualDescription.textContent = scene.description;
     sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
     rememberScene(index);
