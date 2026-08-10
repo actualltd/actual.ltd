@@ -74,11 +74,14 @@
     <main class="site" id="site" data-ready="false" data-switching="false">
       <div class="visual" aria-hidden="true">
         <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
+        <div class="dither-motion" id="dither-motion">
+          <span class="dither-layer dither-layer-a"></span>
+          <span class="dither-layer dither-layer-b"></span>
+        </div>
         <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
       </div>
 
-      <div class="bottom-overlay">
-        <div class="wordmark" aria-hidden="true">ACTUAL</div>
+      <div class="top-overlay">
         <button class="scene-control" id="scene-control" type="button" aria-label="Show another animal">
           <span id="scene-index">#000</span>
           <span id="scene-name">ORYX</span>
@@ -86,9 +89,17 @@
         </button>
       </div>
 
+      <div class="bottom-overlay">
+        <div class="wordmark" aria-hidden="true"><span class="wordmark-letter">A</span><span class="wordmark-letter">C</span><span class="wordmark-letter">T</span><span class="wordmark-letter">U</span><span class="wordmark-letter">A</span><span class="wordmark-letter">L</span></div>
+        <div class="company-record" aria-label="ACTUAL company information">
+          <span>BANGKOK</span>
+          <span>THAILAND</span>
+          <a class="contact" href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
+        </div>
+      </div>
+
       <h1 class="visually-hidden">ACTUAL</h1>
 
-      <a class="contact" href="mailto:hello@actual.ltd">HELLO@ACTUAL.LTD ↗</a>
       <p class="visually-hidden" id="visual-description" aria-live="polite"></p>
 
       <noscript>
