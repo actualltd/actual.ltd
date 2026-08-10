@@ -17,20 +17,21 @@ if (!/drop-shadow\(0 0 [^)]+#fff\)/.test(styles)) {
   failures.push("Animal hover needs a white inner halo so the glow remains visibly bright in every scene.");
 }
 
-const transitionMatch = styles.match(/\.animal-parallax\{[^}]*transition:filter\s+([\d.]+)s/);
-if (!transitionMatch || Number(transitionMatch[1]) > 0.25) {
-  failures.push("Animal glow must reach full brightness within 250ms.");
+const restingRule = styles.match(/\.animal-parallax\{([^}]*)\}/)?.[1] ?? "";
+if (restingRule.includes("transition:filter")) {
+  failures.push("Animal glow cannot transition the filter property; browsers may interpolate its shadow colors through black.");
 }
 
-const restingRule = styles.match(/\.animal-parallax\{([^}]*)\}/)?.[1] ?? "";
-const glowClearDefinitions = styles.match(/--glow-clear:/g)?.length ?? 0;
-if (!restingRule.includes("rgb(255 255 255 / 0)") || (restingRule.match(/var\(--glow-clear\)/g)?.length ?? 0) < 2) {
-  failures.push("Animal glow must start from an explicit color-preserving transparent shadow stack, never filter:none.");
+const activeRule = styles.match(/\.animal-parallax\[data-hit="true"\][^{]*\{([^}]*)\}/)?.[1] ?? "";
+if (!activeRule.includes("animation:animal-glow-in")) {
+  failures.push("Animal hover must use the color-safe glow keyframes.");
 }
-if (glowClearDefinitions !== 6) {
-  failures.push("Every scene and the default palette need a transparent version of their glow color.");
+
+const keyframes = styles.match(/@keyframes animal-glow-in\{([\s\S]*?)\}\}/)?.[1] ?? "";
+if (!keyframes || keyframes.includes("transparent") || /\/\s*0\)/.test(keyframes)) {
+  failures.push("Glow keyframes must use the final opaque scene colors from their first frame.");
 }
 
 if (failures.length) throw new Error(failures.join("\n"));
 
-console.log(`Animal hover keeps its alpha threshold at ${threshold} and transitions directly through its scene glow color.`);
+console.log(`Animal hover keeps its alpha threshold at ${threshold} and animates only color-safe glow radii.`);
