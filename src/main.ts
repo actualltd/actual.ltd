@@ -7,6 +7,7 @@ import {
   styleEffect,
   type AnimationPlaybackControls,
 } from "motion";
+import { createAnimalGlowController } from "./animal-glow";
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -19,6 +20,7 @@ type Scene = {
   landscape: string;
   animal: string;
   cardImage: string;
+  glow: string;
   label: string;
   name: string;
   description: string;
@@ -38,6 +40,7 @@ const scenes: readonly Scene[] = [
     landscape: "/animals/posters/landscape-01-oryx.png",
     animal: "/animals/posters/cutout-01-oryx.png",
     cardImage: "/animals/cards/01-oryx.webp",
+    glow: "#72fff1",
     label: "ORYX",
     name: "Walking oryx",
     description: "An Arabian oryx walking with its head turned away against vivid cobalt blue.",
@@ -53,6 +56,7 @@ const scenes: readonly Scene[] = [
     landscape: "/animals/posters/landscape-02-crane.png",
     animal: "/animals/posters/cutout-02-crane.png",
     cardImage: "/animals/cards/02-crane.webp",
+    glow: "#fff36b",
     label: "CRANE",
     name: "Landing crane",
     description: "A red-crowned crane landing with its head turned away against vivid vermilion.",
@@ -68,6 +72,7 @@ const scenes: readonly Scene[] = [
     landscape: "/animals/posters/landscape-03-stag.png",
     animal: "/animals/posters/cutout-03-stag.png",
     cardImage: "/animals/cards/03-stag.webp",
+    glow: "#ff81ed",
     label: "STAG",
     name: "White stag",
     description: "A white stag seen from behind against vivid ultraviolet.",
@@ -83,6 +88,7 @@ const scenes: readonly Scene[] = [
     landscape: "/animals/posters/landscape-04-tiger.png",
     animal: "/animals/posters/cutout-04-tiger.png",
     cardImage: "/animals/cards/04-tiger.webp",
+    glow: "#fff36b",
     label: "TIGER",
     name: "Stretching tiger",
     description: "A Bengal tiger stretching with its face concealed against vivid emerald.",
@@ -98,6 +104,7 @@ const scenes: readonly Scene[] = [
     landscape: "/animals/posters/landscape-05-sailfish.png",
     animal: "/animals/posters/cutout-05-sailfish.png",
     cardImage: "/animals/cards/05-sailfish.webp",
+    glow: "#78f7ff",
     label: "SAILFISH",
     name: "Swimming sailfish",
     description: "A sailfish swimming out of frame against vivid saffron.",
@@ -131,6 +138,8 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const site = requireElement<HTMLElement>("#site");
 const backgroundParallax = requireElement<HTMLElement>("#background-parallax");
 const animalParallax = requireElement<HTMLElement>("#animal-parallax");
+const animalSprite = requireElement<HTMLElement>("#animal-sprite");
+const animalGlowHost = requireElement<HTMLElement>("#animal-glow");
 const heroBackground = requireElement<HTMLImageElement>("#hero-background");
 const heroAnimal = requireElement<HTMLImageElement>("#hero-animal");
 const wordmark = requireElement<HTMLElement>(".wordmark");
@@ -158,6 +167,7 @@ const visualDescription = requireElement<HTMLElement>("#visual-description");
 const ditherLayers = Array.from(document.querySelectorAll<HTMLElement>(".dither-layer"));
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const portraitLayout = window.matchMedia("(max-aspect-ratio: 4/5)");
+const animalGlowController = createAnimalGlowController(animalGlowHost, reducedMotion);
 
 let currentScene = Math.min(
   scenes.length - 1,
@@ -176,6 +186,8 @@ const ANIMAL_HIT_ALPHA_THRESHOLD = 48;
 let animalAlphaData: Uint8ClampedArray | null = null;
 let animalAlphaWidth = 0;
 let animalAlphaHeight = 0;
+let animalPointerHit = false;
+let animalKeyboardHit = false;
 
 function rememberScene(index: number): void {
   try { sessionStorage.setItem("actual-scene", String(index)); } catch {}
@@ -194,8 +206,20 @@ function preload(src: string): Promise<void> {
   });
 }
 
-function setAnimalHitState(active: boolean): void {
+function updateAnimalHitState(): void {
+  const active = animalPointerHit || animalKeyboardHit;
   animalParallax.dataset.hit = active ? "true" : "false";
+  animalGlowController.setHovered(active);
+}
+
+function setAnimalHitState(active: boolean): void {
+  animalPointerHit = active;
+  updateAnimalHitState();
+}
+
+function setAnimalKeyboardHit(active: boolean): void {
+  animalKeyboardHit = active;
+  updateAnimalHitState();
 }
 
 async function refreshAnimalHitMask(): Promise<void> {
@@ -240,7 +264,7 @@ function startIdleMotion(index: number): void {
   stopIdleMotion();
   if (reducedMotion.matches || document.hidden) return;
   const profile = idleProfiles[index];
-  idleAnimation = animate(heroAnimal, {
+  idleAnimation = animate(animalSprite, {
     x: profile.x,
     y: profile.y,
     rotate: profile.rotate,
@@ -334,7 +358,7 @@ async function runInitialEntrance(): Promise<void> {
     opacity: [0, 1],
     filter: ["saturate(.58) contrast(.9) brightness(1.08)", "saturate(1) contrast(1) brightness(1)"],
   }, { duration: 1.4, ease });
-  const animalEntrance = animate(heroAnimal, {
+  const animalEntrance = animate(animalSprite, {
     opacity: [0, 1],
     y: [42, 0],
     scale: [0.975, 1],
@@ -372,10 +396,9 @@ async function exitScene(): Promise<void> {
   stopIdleMotion();
   if (reducedMotion.matches) return;
 
-  const animalExit = animate(heroAnimal, {
+  const animalExit = animate(animalSprite, {
     opacity: [1, 0],
     y: [0, -18],
-    filter: ["blur(0px)", "blur(7px)"],
   }, { duration: 0.42, ease: [0.7, 0, 0.84, 0] });
   const backgroundExit = animate(heroBackground, {
     opacity: [1, 0.58],
@@ -407,11 +430,10 @@ async function enterScene(index: number): Promise<void> {
     opacity: [0.58, 1],
     filter: ["saturate(.72) contrast(.94)", "saturate(1) contrast(1)"],
   }, { duration: 0.72, ease });
-  const animalEntrance = animate(heroAnimal, {
+  const animalEntrance = animate(animalSprite, {
     opacity: [0, 1],
     y: [30, 0],
     scale: [0.985, 1],
-    filter: ["blur(7px)", "blur(0px)"],
     clipPath: ["inset(100% 0 0 0)", "inset(0% 0 0 0)"],
   }, { duration: 0.88, delay: 0.08, ease });
   animate(sceneControl.querySelectorAll("span"), {
@@ -435,6 +457,7 @@ function applyScene(index: number, background: string): void {
   const scene = scenes[index];
   currentScene = index;
   document.documentElement.dataset.scene = String(index);
+  document.documentElement.style.setProperty("--glow", scene.glow);
   heroBackground.src = background;
   heroAnimal.src = scene.animal;
   void refreshAnimalHitMask();
@@ -473,9 +496,15 @@ async function renderScene(index: number, initial = false): Promise<void> {
   const background = backgroundFor(scene);
   transitioning = true;
   site.dataset.switching = "true";
+  setAnimalHitState(false);
+  setAnimalKeyboardHit(false);
 
   try {
-    await Promise.all([preload(background), preload(scene.animal)]);
+    await Promise.all([
+      preload(background),
+      preload(scene.animal),
+      animalGlowController.prepare(String(index), scene.animal, scene.glow),
+    ]);
     if (request !== sceneRequest) return;
     if (!initial) await exitScene();
     if (request !== sceneRequest) return;
@@ -520,6 +549,8 @@ sceneControl.addEventListener("click", () => {
 function openAnimalDialog(): void {
   if (animalDialog.open || animalClosing || transitioning) return;
   populateAnimalCard(scenes[currentScene], currentScene);
+  setAnimalHitState(false);
+  setAnimalKeyboardHit(false);
   stopIdleMotion();
   animalDialog.showModal();
   heroAnimal.setAttribute("aria-expanded", "true");
@@ -554,12 +585,17 @@ heroAnimal.addEventListener("pointermove", (event) => {
   setAnimalHitState(isOpaqueAnimalPixel(event));
 });
 heroAnimal.addEventListener("pointerleave", () => { setAnimalHitState(false); });
+heroAnimal.addEventListener("focus", () => {
+  queueMicrotask(() => setAnimalKeyboardHit(heroAnimal.matches(":focus-visible")));
+});
+heroAnimal.addEventListener("blur", () => { setAnimalKeyboardHit(false); });
 heroAnimal.addEventListener("click", (event) => {
   if (isOpaqueAnimalPixel(event)) openAnimalDialog();
 });
 heroAnimal.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
+  setAnimalKeyboardHit(true);
   openAnimalDialog();
 });
 animalClose.addEventListener("click", () => { void closeAnimalDialog(); });
@@ -639,6 +675,7 @@ portraitLayout.addEventListener("change", () => {
 });
 
 document.addEventListener("visibilitychange", () => {
+  animalGlowController.setDocumentVisible(!document.hidden);
   if (document.hidden) {
     stopIdleMotion();
     ditherAnimations.forEach((animation) => animation.pause());
@@ -647,6 +684,14 @@ document.addEventListener("visibilitychange", () => {
     startDitherMotion();
   }
 });
+
+reducedMotion.addEventListener("change", () => {
+  updateAnimalHitState();
+});
+
+window.addEventListener("pagehide", (event) => {
+  if (!event.persisted) animalGlowController.dispose();
+}, { once: true });
 
 initialiseParallax();
 void renderScene(currentScene, true);
