@@ -74,13 +74,17 @@
     <main class="site" id="site" data-ready="false" data-switching="false">
       <div class="visual" aria-hidden="true">
         <img class="poster-background" id="hero-background" alt="" decoding="async" fetchpriority="high" />
-        <div class="wordmark">ACTUAL</div>
         <img class="animal" id="hero-animal" alt="" decoding="async" fetchpriority="high" />
       </div>
 
-      <button class="scene-control" id="scene-control" type="button" aria-label="Show another animal">
-        <span id="scene-index">#000</span>
-      </button>
+      <div class="bottom-overlay">
+        <div class="wordmark" aria-hidden="true">ACTUAL</div>
+        <button class="scene-control" id="scene-control" type="button" aria-label="Show another animal">
+          <span id="scene-index">#000</span>
+          <span id="scene-name">ORYX</span>
+          <span class="scene-next" aria-hidden="true">NEXT</span>
+        </button>
+      </div>
 
       <h1 class="visually-hidden">ACTUAL</h1>
 

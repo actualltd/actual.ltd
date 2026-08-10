@@ -10,6 +10,7 @@ type Scene = {
   portrait: string;
   landscape: string;
   animal: string;
+  label: string;
   name: string;
   description: string;
 };
@@ -21,6 +22,7 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-01-oryx.png",
     landscape: "/animals/posters/landscape-01-oryx.png",
     animal: "/animals/posters/cutout-01-oryx.png",
+    label: "ORYX",
     name: "Walking oryx",
     description: "An Arabian oryx walking with its head turned away against vivid cobalt blue.",
   },
@@ -28,6 +30,7 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-02-crane.png",
     landscape: "/animals/posters/landscape-02-crane.png",
     animal: "/animals/posters/cutout-02-crane.png",
+    label: "CRANE",
     name: "Landing crane",
     description: "A red-crowned crane landing with its head turned away against vivid vermilion.",
   },
@@ -35,6 +38,7 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-03-stag.png",
     landscape: "/animals/posters/landscape-03-stag.png",
     animal: "/animals/posters/cutout-03-stag.png",
+    label: "STAG",
     name: "White stag",
     description: "A white stag seen from behind against vivid ultraviolet.",
   },
@@ -42,6 +46,7 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-04-tiger.png",
     landscape: "/animals/posters/landscape-04-tiger.png",
     animal: "/animals/posters/cutout-04-tiger.png",
+    label: "TIGER",
     name: "Stretching tiger",
     description: "A Bengal tiger stretching with its face concealed against vivid emerald.",
   },
@@ -49,6 +54,7 @@ const scenes: readonly Scene[] = [
     portrait: "/animals/posters/portrait-05-sailfish.png",
     landscape: "/animals/posters/landscape-05-sailfish.png",
     animal: "/animals/posters/cutout-05-sailfish.png",
+    label: "SAILFISH",
     name: "Swimming sailfish",
     description: "A sailfish swimming out of frame against vivid saffron.",
   },
@@ -59,6 +65,7 @@ const heroBackground = requireElement<HTMLImageElement>("#hero-background");
 const heroAnimal = requireElement<HTMLImageElement>("#hero-animal");
 const sceneControl = requireElement<HTMLButtonElement>("#scene-control");
 const sceneIndex = requireElement<HTMLElement>("#scene-index");
+const sceneName = requireElement<HTMLElement>("#scene-name");
 const visualDescription = requireElement<HTMLElement>("#visual-description");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const portraitLayout = window.matchMedia("(max-aspect-ratio: 4/5)");
@@ -104,6 +111,7 @@ function renderScene(index: number, initial = false): void {
     heroAnimal.src = scene.animal;
     heroAnimal.alt = scene.description;
     sceneIndex.textContent = `#${String(index).padStart(3, "0")}`;
+    sceneName.textContent = scene.label;
     visualDescription.textContent = scene.description;
     sceneControl.setAttribute("aria-label", `Show another animal. Current image: ${scene.name}`);
     rememberScene(index);
