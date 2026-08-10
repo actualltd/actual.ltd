@@ -296,8 +296,8 @@ async function writeAnimalCutout(scene) {
 }
 
 for (const scene of scenes) {
-  await writeDitheredPoster(join(outputDir, `portrait-${scene.slug}.png`), 1080, 1920, scene, 0.27, 0.49);
-  await writeDitheredPoster(join(outputDir, `landscape-${scene.slug}.png`), 1920, 1080, scene, 0.23, 0.52);
+  await writeDitheredPoster(join(outputDir, `portrait-${scene.slug}.png`), 1080, 1920, scene, 0.18, 0.42);
+  await writeDitheredPoster(join(outputDir, `landscape-${scene.slug}.png`), 1920, 1080, scene, 0.15, 0.44);
   await writeAnimalCutout(scene);
 }
 
