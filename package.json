@@ -10,7 +10,7 @@
     "build:animal-gallery": "node scripts/build-card-gallery.mjs",
     "build:scene-previews": "node scripts/build-scene-previews.mjs",
     "audit": "npm audit --audit-level=moderate && npm audit signatures",
-    "check": "npm run typecheck && npm run check:security && npm run check:accessibility && node scripts/check-animal-placement.mjs && node scripts/check-animal-hover.mjs && node scripts/check-scene-loading.mjs && node scripts/check-background-overscan.mjs && node scripts/check-shark-gallery-palette.mjs && npm run check:deployment",
+    "check": "npm run typecheck && npm run check:security && npm run check:accessibility && node scripts/check-animal-placement.mjs && node scripts/check-animal-hover.mjs && node scripts/check-scene-loading.mjs && node scripts/check-background-overscan.mjs && node scripts/check-blend-stacking.mjs && node scripts/check-shark-gallery-palette.mjs && npm run check:deployment",
     "check:accessibility": "node scripts/check-accessibility.mjs",
     "check:deployment": "node scripts/check-github-deployment.mjs",
     "check:security": "node scripts/check-security.mjs",
