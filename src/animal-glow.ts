@@ -28,8 +28,39 @@ type GlowController = {
 };
 
 const MASK_ALPHA_THRESHOLD = 48;
+const PROCESSED_MASK_EMPTY_THRESHOLD = 8;
 const MAX_SHADER_PIXELS = 1_500_000;
 const GLOW_MASK_PADDING = 0.5;
+const HEATMAP_TRANSPARENCY_FLOOR = 0.025;
+const HEATMAP_GLOW_FULL = 0.88;
+const GLOW_VISIBLE_OPACITY = 0.86;
+const GLOW_ENTER_DURATION = 380;
+const GLOW_LEAVE_DURATION = 460;
+const GLOW_ENTER_EASING = "cubic-bezier(.16,1,.3,1)";
+const GLOW_LEAVE_EASING = "cubic-bezier(.4,0,.2,1)";
+
+function createAnimalHeatmapFragmentShader(): string {
+  const frameMarker = "  float imgSoftFrame = getImgFrame(imgUV, .03);";
+  const outerBlurMarker = "  float outerBlur = 1. - mix(1., img[1], shape);";
+  const mixerMarker = "  float mixer = heat * u_colorsCount;";
+  const noiseMarker = "  color += .02 * (fract";
+  if (!heatmapFragmentShader.includes(frameMarker)
+    || !heatmapFragmentShader.includes(outerBlurMarker)
+    || !heatmapFragmentShader.includes(mixerMarker)
+    || !heatmapFragmentShader.includes(noiseMarker)) {
+    throw new Error("The installed Paper Heatmap shader is incompatible with the animal glow.");
+  }
+  return heatmapFragmentShader
+    .replace(frameMarker, "  float imgSoftFrame = getImgFrame(imgUV, .16);")
+    .replace(outerBlurMarker, "  float outerBlur = pow(max(img[0] * (1. - img[2]), 0.), .5);")
+    .replace(noiseMarker, "  color += opacity * .02 * (fract")
+    .replace(
+    mixerMarker,
+    `  heat = heat < ${HEATMAP_TRANSPARENCY_FLOOR} ? 0.0 : smoothstep(${HEATMAP_TRANSPARENCY_FLOOR}, ${HEATMAP_GLOW_FULL}, heat);\n\n${mixerMarker}`,
+    );
+}
+
+const animalHeatmapFragmentShader = createAnimalHeatmapFragmentShader();
 
 function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -50,6 +81,43 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+function fillEnclosedMaskHoles(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const exterior = new Uint8Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  let head = 0;
+  let tail = 0;
+  const visit = (index: number): void => {
+    if (mask[index] || exterior[index]) return;
+    exterior[index] = 1;
+    queue[tail++] = index;
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    visit(x);
+    visit((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y += 1) {
+    visit(y * width);
+    visit(y * width + width - 1);
+  }
+
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % width;
+    const y = Math.floor(index / width);
+    if (x > 0) visit(index - 1);
+    if (x < width - 1) visit(index + 1);
+    if (y > 0) visit(index - width);
+    if (y < height - 1) visit(index + width);
+  }
+
+  const solid = mask.slice();
+  for (let index = 0; index < solid.length; index += 1) {
+    if (!solid[index] && !exterior[index]) solid[index] = 1;
+  }
+  return solid;
+}
+
 async function createAlphaLuminanceMask(cutoutUrl: string): Promise<{ blob: Blob; layout: MaskLayout }> {
   const cutout = await loadImage(cutoutUrl);
   const sourceCanvas = document.createElement("canvas");
@@ -62,20 +130,25 @@ async function createAlphaLuminanceMask(cutoutUrl: string): Promise<{ blob: Blob
   context.drawImage(cutout, 0, 0);
   const imageData = context.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
   const pixels = imageData.data;
+  const rawMask = new Uint8Array(sourceCanvas.width * sourceCanvas.height);
+  for (let pixelIndex = 0; pixelIndex < rawMask.length; pixelIndex += 1) {
+    rawMask[pixelIndex] = pixels[pixelIndex * 4 + 3] >= MASK_ALPHA_THRESHOLD ? 1 : 0;
+  }
+  const solidMask = fillEnclosedMaskHoles(rawMask, sourceCanvas.width, sourceCanvas.height);
   let minX = sourceCanvas.width;
   let minY = sourceCanvas.height;
   let maxX = -1;
   let maxY = -1;
 
   for (let offset = 0; offset < pixels.length; offset += 4) {
-    const opaque = pixels[offset + 3] >= MASK_ALPHA_THRESHOLD;
+    const pixelIndex = offset / 4;
+    const opaque = solidMask[pixelIndex] === 1;
     const luminance = opaque ? 0 : 255;
     pixels[offset] = luminance;
     pixels[offset + 1] = luminance;
     pixels[offset + 2] = luminance;
     pixels[offset + 3] = 255;
     if (opaque) {
-      const pixelIndex = offset / 4;
       const x = pixelIndex % sourceCanvas.width;
       const y = Math.floor(pixelIndex / sourceCanvas.width);
       minX = Math.min(minX, x);
@@ -120,13 +193,42 @@ async function createAlphaLuminanceMask(cutoutUrl: string): Promise<{ blob: Blob
   };
 }
 
+async function clearProcessedMaskBackground(blob: Blob): Promise<Blob> {
+  const sourceUrl = URL.createObjectURL(blob);
+  try {
+    const image = await loadImage(sourceUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Unable to clean the processed animal mask.");
+
+    context.drawImage(image, 0, 0);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const departureFromEmpty = 255 - Math.min(
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+      );
+      pixels[offset + 3] = departureFromEmpty >= PROCESSED_MASK_EMPTY_THRESHOLD ? 255 : 0;
+    }
+    context.putImageData(imageData, 0, 0);
+    return canvasToBlob(canvas);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
 async function processMask(cutoutUrl: string): Promise<ProcessedMask> {
   const { blob: luminanceBlob, layout } = await createAlphaLuminanceMask(cutoutUrl);
   const luminanceUrl = URL.createObjectURL(luminanceBlob);
 
   try {
     const { blob } = await toProcessedHeatmap(luminanceUrl);
-    const objectUrl = URL.createObjectURL(blob);
+    const transparentBlob = await clearProcessedMaskBackground(blob);
+    const objectUrl = URL.createObjectURL(transparentBlob);
     try {
       const image = await loadImage(objectUrl);
       return { image, objectUrl, layout };
@@ -141,6 +243,12 @@ async function processMask(cutoutUrl: string): Promise<ProcessedMask> {
 
 function heatmapUniforms(image: HTMLImageElement, glowColor: string): ShaderMountUniforms {
   const glow = getShaderColorFromString(glowColor);
+  const coreGlow: [number, number, number, number] = [
+    glow[0] + (1 - glow[0]) * 0.48,
+    glow[1] + (1 - glow[1]) * 0.48,
+    glow[2] + (1 - glow[2]) * 0.48,
+    1,
+  ];
   return {
     u_image: image,
     u_imageAspectRatio: image.naturalWidth / image.naturalHeight,
@@ -153,15 +261,22 @@ function heatmapUniforms(image: HTMLImageElement, glowColor: string): ShaderMoun
     u_offsetY: 0,
     u_worldWidth: 0,
     u_worldHeight: 0,
-    u_contour: 0.14,
+    u_contour: 0.11,
     u_angle: 0,
     u_noise: 0,
     u_innerGlow: 0,
-    u_outerGlow: 0.5,
+    u_outerGlow: 0.26,
     u_colorBack: [0, 0, 0, 0],
-    u_colors: [glow, glow, [1, 1, 1, 1]],
+    u_colors: [glow, glow, coreGlow],
     u_colorsCount: 3,
   };
+}
+
+function ensurePaperShaderStyleMarker(): void {
+  if (document.querySelector("style[data-paper-shader]")) return;
+  const marker = document.createElement("style");
+  marker.setAttribute("data-paper-shader", "");
+  document.head.prepend(marker);
 }
 
 export function createAnimalGlowController(
@@ -186,11 +301,13 @@ export function createAnimalGlowController(
     mount?.setSpeed(active ? 0.12 : 0);
   };
 
-  const setOpacity = (target: 0 | 1, duration: number): void => {
+  const setOpacity = (target: number, duration: number, easing: string): void => {
     presentationToken += 1;
     const token = presentationToken;
+    const current = Number.parseFloat(getComputedStyle(host).opacity) || 0;
     opacityAnimation?.cancel();
     opacityAnimation = null;
+    host.style.opacity = String(current);
 
     if (duration === 0) {
       host.style.opacity = String(target);
@@ -198,10 +315,10 @@ export function createAnimalGlowController(
       return;
     }
 
-    const current = Number.parseFloat(getComputedStyle(host).opacity) || 0;
+    const effectiveDuration = Math.max(90, Math.round(duration * Math.abs(target - current)));
     const animation = host.animate(
       [{ opacity: current }, { opacity: target }],
-      { duration, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" },
+      { duration: effectiveDuration, easing, fill: "forwards" },
     );
     opacityAnimation = animation;
     animation.addEventListener("finish", () => {
@@ -221,11 +338,15 @@ export function createAnimalGlowController(
     presentedReducedMotion = reduced;
     if (!documentVisible) {
       setSpeed(false);
-      setOpacity(0, 0);
+      setOpacity(0, 0, GLOW_LEAVE_EASING);
       return;
     }
     if (active) setSpeed(!reduced);
-    setOpacity(active ? 1 : 0, reduced ? 0 : active ? 140 : 100);
+    setOpacity(
+      active ? GLOW_VISIBLE_OPACITY : 0,
+      reduced ? 0 : active ? GLOW_ENTER_DURATION : GLOW_LEAVE_DURATION,
+      active ? GLOW_ENTER_EASING : GLOW_LEAVE_EASING,
+    );
   };
 
   const activateMask = (mask: ProcessedMask, glowColor: string): void => {
@@ -235,16 +356,17 @@ export function createAnimalGlowController(
     host.style.height = `${mask.layout.height * 100}%`;
     const uniforms = heatmapUniforms(mask.image, glowColor);
     if (!mount) {
+      ensurePaperShaderStyleMarker();
       mount = new ShaderMount(
         host,
-        heatmapFragmentShader,
+        animalHeatmapFragmentShader,
         uniforms,
         { alpha: true, premultipliedAlpha: true },
         0,
         0,
         1,
         MAX_SHADER_PIXELS,
-        ["u_image"],
+        [],
       );
       mount.canvasElement.setAttribute("aria-hidden", "true");
       mount.canvasElement.tabIndex = -1;

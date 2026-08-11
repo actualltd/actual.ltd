@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const sourceDir = join(root, "site-public", "animals");
-const outputDir = join(sourceDir, "posters");
+const sourceDir = join(root, "source-assets", "animals");
+const outputDir = join(root, "site-public", "animals", "posters");
 mkdirSync(outputDir, { recursive: true });
 
 const bayer8 = [
@@ -56,8 +56,8 @@ const scenes = [
     palette: ["f2a33d", "f5e6c4", "152c28"],
   },
   {
-    file: "05-sailfish.webp", slug: "05-sailfish", color: "ee9704", pattern: "noise", cell: 2,
-    crop: { left: 0, top: 105, width: 1020, height: 850 },
+    file: "05-thresher-shark.webp", slug: "05-thresher-shark", color: "d95622", sourceColor: "ee9704", pattern: "noise", cell: 2,
+    crop: { left: 70, top: 80, width: 1420, height: 840 },
     palette: ["0a315f", "166ca0", "e9d4a3"],
   },
 ];
@@ -264,7 +264,7 @@ function ditherAnimal(data, alpha, width, height, scene) {
 }
 
 async function writeAnimalCutout(scene) {
-  const background = hexToRgb(scene.color);
+  const background = hexToRgb(scene.sourceColor ?? scene.color);
   const { data, info } = await sharp(join(sourceDir, scene.file))
     .extract(scene.crop)
     .ensureAlpha()
