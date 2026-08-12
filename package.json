@@ -24,8 +24,8 @@
     "motion": "12.43.0"
   },
   "devDependencies": {
-    "sharp": "^0.35.2",
+    "sharp": "^0.35.3",
     "typescript": "7.0.2",
-    "vite": "8.2.0"
+    "vite": "8.2.1"
   }
 }
