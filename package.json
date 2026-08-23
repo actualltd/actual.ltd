@@ -20,8 +20,8 @@
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
-    "@paper-design/shaders": "0.0.78",
-    "motion": "12.43.0"
+    "@paper-design/shaders": "0.0.80",
+    "motion": "13.1.1"
   },
   "devDependencies": {
     "sharp": "^0.35.2",
